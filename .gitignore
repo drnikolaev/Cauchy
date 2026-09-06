@@ -1,0 +1,59 @@
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+
+# Rust
+/target/
+**/*.rs.bk
+
+# C, C++, and Fortran build products
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.mod
+*.smod
+*.d
+
+# Common build directories
+/build/
+/dist/
+/cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# Coverage and profiling output
+*.gcda
+*.gcno
+*.gcov
+coverage/
+
+# Local scratch directories
+/work/
+

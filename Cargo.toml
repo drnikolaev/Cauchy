@@ -1,0 +1,10 @@
+[package]
+name = "cauchy"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "cauchy"
+
+[dependencies]
+num-traits = "0.2"

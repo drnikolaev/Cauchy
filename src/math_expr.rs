@@ -472,11 +472,19 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
             }
             Operation::NaturalLogarithm => {
                 let (operand,) = self.unary_operands(Operation::NaturalLogarithm).unwrap();
-                Self::simplify_natural_logarithm(operand.simplify())
+                let operand = operand.simplify();
+                match operand.constant_value() {
+                    Some(value) => Self::new_const(value.ln()),
+                    None => Self::new_ln(operand),
+                }
             }
             Operation::CommonLogarithm => {
                 let (operand,) = self.unary_operands(Operation::CommonLogarithm).unwrap();
-                Self::simplify_common_logarithm(operand.simplify())
+                let operand = operand.simplify();
+                match operand.constant_value() {
+                    Some(value) => Self::new_const(value.log10()),
+                    None => Self::new_log10(operand),
+                }
             }
             Operation::ImmediateIf => {
                 let (check, if_less_than_zero, otherwise) =
@@ -619,10 +627,16 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 (&base.operation, base.operands.as_slice())
             {
                 if let Some(inner_exponent) = inner_exponent.constant_value() {
-                    return Self::simplify_power(
-                        inner_base.clone(),
-                        Self::new_const(inner_exponent * exponent_value),
-                    );
+                    let exponents_are_integers = inner_exponent.is_finite()
+                        && inner_exponent.fract() == T::zero()
+                        && exponent_value.is_finite()
+                        && exponent_value.fract() == T::zero();
+                    if exponents_are_integers {
+                        return Self::simplify_power(
+                            inner_base.clone(),
+                            Self::new_const(inner_exponent * exponent_value),
+                        );
+                    }
                 }
             }
 
@@ -632,30 +646,6 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
         }
 
         Self::new_power(base, exponent)
-    }
-
-    fn simplify_natural_logarithm(operand: Self) -> Self {
-        match (&operand.operation, operand.operands.as_slice()) {
-            (Operation::Power, [base, exponent]) => {
-                Self::simplify_product(exponent.clone(), Self::new_ln(base.clone()))
-            }
-            _ => match operand.constant_value() {
-                Some(value) => Self::new_const(value.ln()),
-                None => Self::new_ln(operand),
-            },
-        }
-    }
-
-    fn simplify_common_logarithm(operand: Self) -> Self {
-        match (&operand.operation, operand.operands.as_slice()) {
-            (Operation::Power, [base, exponent]) => {
-                Self::simplify_product(exponent.clone(), Self::new_log10(base.clone()))
-            }
-            _ => match operand.constant_value() {
-                Some(value) => Self::new_const(value.log10()),
-                None => Self::new_log10(operand),
-            },
-        }
     }
 
     fn simplify_negation(operand: Self) -> Self {

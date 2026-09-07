@@ -725,17 +725,28 @@ fn simplify_nested_power() {
 }
 
 #[test]
-fn simplify_logarithm_of_power() {
-    let expression = MathExpr::<f64>::parse("ln(x ^ y)").unwrap();
+fn preserve_nested_power_with_fractional_exponent() {
+    let expression = MathExpr::<f64>::parse("(x ^ 2) ^ 0.5").unwrap();
+    let simplified = expression.simplify();
+    let args = HashMap::from([("x", -2.0)]);
 
-    assert_eq!(expression.simplify().to_string(), "(y * ln(x))");
+    assert_eq!(simplified.to_string(), "((x ^ 2) ^ 0.5)");
+    assert_eq!(expression.evaluate(&args), Ok(2.0));
+    assert_eq!(simplified.evaluate(&args), Ok(2.0));
 }
 
 #[test]
-fn simplify_common_logarithm_of_power() {
+fn preserve_logarithm_of_power_during_simplification() {
+    let expression = MathExpr::<f64>::parse("ln(x ^ y)").unwrap();
+
+    assert_eq!(expression.simplify().to_string(), "ln((x ^ y))");
+}
+
+#[test]
+fn preserve_common_logarithm_of_power_during_simplification() {
     let expression = MathExpr::<f64>::parse("log10(x ^ y)").unwrap();
 
-    assert_eq!(expression.simplify().to_string(), "(y * log10(x))");
+    assert_eq!(expression.simplify().to_string(), "log10((x ^ y))");
 }
 
 #[test]

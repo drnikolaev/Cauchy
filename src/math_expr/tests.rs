@@ -51,16 +51,16 @@ fn evaluate_division() {
 
 #[test]
 fn evaluate_power() {
-    let expression = MathExpr::new_power(MathExpr::new_const(2.0_f64), 3.0);
+    let expression = MathExpr::new_power(MathExpr::new_const(2.0_f64), MathExpr::new_const(3.0));
     assert_eq!(expression.evaluate(&HashMap::new()), Ok(8.0));
 
-    let expression = MathExpr::new_power(MathExpr::new_const(4.0_f32), -0.5);
+    let expression = MathExpr::new_power(MathExpr::new_const(4.0_f32), MathExpr::new_const(-0.5));
     assert_eq!(expression.evaluate(&HashMap::new()), Ok(0.5));
 }
 
 #[test]
 fn derive_power() {
-    let expression = MathExpr::new_power(MathExpr::<f64>::new_var("x"), 3.0);
+    let expression = MathExpr::new_power(MathExpr::<f64>::new_var("x"), MathExpr::new_const(3.0));
     let derivative = expression.derive("x").simplify();
 
     assert_eq!(derivative.evaluate(&HashMap::from([("x", 2.0)])), Ok(12.0));
@@ -159,7 +159,7 @@ fn evaluate_tan() {
 #[test]
 fn derive_tan() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square = MathExpr::new_power(variable, 2.0);
+    let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
     let derivative = MathExpr::new_tan(square).derive("x").simplify();
     let x = 0.5_f64;
     let expected = 2.0 * x / (x * x).cos().powi(2);
@@ -182,7 +182,7 @@ fn evaluate_asin() {
 #[test]
 fn derive_asin() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square = MathExpr::new_power(variable, 2.0);
+    let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
     let derivative = MathExpr::new_asin(square).derive("x").simplify();
     let x = 0.5_f64;
     let expected = 2.0 * x / (1.0 - x.powi(4)).sqrt();
@@ -205,7 +205,7 @@ fn evaluate_acos() {
 #[test]
 fn derive_acos() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square = MathExpr::new_power(variable, 2.0);
+    let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
     let derivative = MathExpr::new_acos(square).derive("x").simplify();
     let x = 0.5_f64;
     let expected = -2.0 * x / (1.0 - x.powi(4)).sqrt();
@@ -228,7 +228,7 @@ fn evaluate_atan() {
 #[test]
 fn derive_atan() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square = MathExpr::new_power(variable, 2.0);
+    let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
     let derivative = MathExpr::new_atan(square).derive("x").simplify();
     let x = 0.5_f64;
     let expected = 2.0 * x / (1.0 + x.powi(4));
@@ -249,7 +249,7 @@ fn evaluate_sinh() {
 #[test]
 fn derive_sinh() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square = MathExpr::new_power(variable, 2.0);
+    let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
     let derivative = MathExpr::new_sinh(square).derive("x").simplify();
     let x = 0.5_f64;
     let expected = 2.0 * x * (x * x).cosh();
@@ -270,7 +270,7 @@ fn evaluate_cosh() {
 #[test]
 fn derive_cosh() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square = MathExpr::new_power(variable, 2.0);
+    let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
     let derivative = MathExpr::new_cosh(square).derive("x").simplify();
     let x = 0.5_f64;
     let expected = 2.0 * x * (x * x).sinh();
@@ -291,7 +291,7 @@ fn evaluate_tanh() {
 #[test]
 fn derive_tanh() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square = MathExpr::new_power(variable, 2.0);
+    let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
     let derivative = MathExpr::new_tanh(square).derive("x").simplify();
     let x = 0.5_f64;
     let expected = 2.0 * x / (x * x).cosh().powi(2);
@@ -330,8 +330,10 @@ fn evaluate_abs() {
 #[test]
 fn derive_abs() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square_minus_one =
-        MathExpr::new_subtract(MathExpr::new_power(variable, 2.0), MathExpr::new_const(1.0));
+    let square_minus_one = MathExpr::new_subtract(
+        MathExpr::new_power(variable, MathExpr::new_const(2.0)),
+        MathExpr::new_const(1.0),
+    );
     let derivative = MathExpr::new_abs(square_minus_one).derive("x").simplify();
 
     assert_eq!(derivative.evaluate(&HashMap::from([("x", 2.0)])), Ok(4.0));
@@ -350,7 +352,7 @@ fn evaluate_exp() {
 #[test]
 fn derive_exp() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square = MathExpr::new_power(variable, 2.0);
+    let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
     let derivative = MathExpr::new_exp(square).derive("x").simplify();
     let x = 0.5_f64;
     let expected = 2.0 * x * (x * x).exp();
@@ -388,7 +390,7 @@ fn evaluate_ln() {
 #[test]
 fn derive_ln() {
     let variable = MathExpr::<f64>::new_var("x");
-    let square = MathExpr::new_power(variable, 2.0);
+    let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
     let derivative = MathExpr::new_ln(square).derive("x").simplify();
 
     assert_eq!(derivative.evaluate(&HashMap::from([("x", 2.0)])), Ok(1.0));
@@ -444,6 +446,45 @@ fn parse_to_string_output() {
 
     assert_eq!(parsed.to_string(), source);
     assert_eq!(parsed.evaluate(&args), original.evaluate(&args));
+}
+
+#[test]
+fn parse_and_evaluate_complex_expression() {
+    let source = "sqrt(x ^ 2 + y ^ 2) + sin(theta) * exp(ln(scale)) - abs(offset) / log10(100)";
+    let expression = MathExpr::<f64>::parse(source).unwrap();
+    let args = HashMap::from([
+        ("x", 3.0),
+        ("y", 4.0),
+        ("theta", std::f64::consts::FRAC_PI_2),
+        ("scale", 4.0),
+        ("offset", -3.0),
+    ]);
+
+    let result = expression.evaluate(&args).unwrap();
+
+    assert!((result - 7.5).abs() < 1e-12);
+}
+
+#[test]
+fn parse_and_evaluate_complex_expression_derivatives() {
+    let source = "sqrt(x ^ 2 + Y ^ 2) + sin(theta) * exp(ln(scale)) - abs(offset) / log10(100)";
+    let expression = MathExpr::<f64>::parse(source).unwrap();
+    let args = HashMap::from([
+        ("x", 3.0),
+        ("Y", 4.0),
+        ("theta", std::f64::consts::FRAC_PI_2),
+        ("scale", 4.0),
+        ("offset", -3.0),
+    ]);
+
+    let dx = expression.derive("x").simplify();
+    let dy = expression.derive("Y").simplify();
+    let derivative_by_x = dx.evaluate(&args).unwrap();
+    let derivative_by_y = dy.evaluate(&args).unwrap();
+    println!("{:?}", dx);
+    println!("{:?}", dy);
+    assert!((derivative_by_x - 0.6).abs() < 1e-12);
+    assert!((derivative_by_y - 0.8).abs() < 1e-12);
 }
 
 #[test]
@@ -583,10 +624,37 @@ fn simplify_like_terms_and_constants() {
 }
 
 #[test]
+fn simplify_subtracting_identical_variables() {
+    let expression = MathExpr::<f64>::parse("x - x").unwrap();
+
+    assert_eq!(expression.simplify().to_string(), "0");
+}
+
+#[test]
+fn simplify_dividing_identical_variables() {
+    let expression = MathExpr::<f64>::parse("x / x").unwrap();
+
+    assert_eq!(expression.simplify().to_string(), "1");
+}
+
+#[test]
 fn simplify_numeric_operations() {
     let expression = MathExpr::<f64>::parse("sin(0) + cos(0) * 1").unwrap();
 
     assert_eq!(expression.simplify().to_string(), "1");
+}
+
+#[test]
+fn simplify_zero_quotient_cascades_through_expression() {
+    let expression = MathExpr::<f64>::parse(
+        "(((2 * x) / (2 * sqrt(((x ^ 2) + (Y ^ 2))))) + (sin(theta) * ((0 / scale) * exp(ln(scale)))))",
+    )
+    .unwrap();
+
+    assert_eq!(
+        expression.simplify().to_string(),
+        "((2 * x) / (2 * sqrt(((x ^ 2) + (Y ^ 2)))))"
+    );
 }
 
 #[test]
@@ -612,6 +680,20 @@ fn simplify_power() {
             .to_string(),
         "8"
     );
+}
+
+#[test]
+fn simplify_nested_power() {
+    let expression = MathExpr::<f64>::parse("(x ^ 3) ^ 2").unwrap();
+
+    assert_eq!(expression.simplify().to_string(), "(x ^ 6)");
+}
+
+#[test]
+fn simplify_logarithm_of_power() {
+    let expression = MathExpr::<f64>::parse("ln(x ^ y)").unwrap();
+
+    assert_eq!(expression.simplify().to_string(), "(y * ln(x))");
 }
 
 #[test]

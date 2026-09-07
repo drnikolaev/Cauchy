@@ -102,7 +102,7 @@ where
         let base = self.parse_primary()?;
 
         if self.consume_symbol('^') {
-            let exponent = self.parse_signed_number_value()?;
+            let exponent = self.parse_unary()?;
             Ok(MathExpr::new_power(base, exponent))
         } else {
             Ok(base)
@@ -130,13 +130,6 @@ where
 
     fn parse_number(&mut self) -> Result<MathExpr<'a, T>, ParseError> {
         self.parse_number_value().map(MathExpr::new_const)
-    }
-
-    fn parse_signed_number_value(&mut self) -> Result<T, ParseError> {
-        self.skip_whitespace();
-        let negative = self.consume_symbol('-');
-        let value = self.parse_number_value()?;
-        Ok(if negative { -value } else { value })
     }
 
     fn parse_number_value(&mut self) -> Result<T, ParseError> {

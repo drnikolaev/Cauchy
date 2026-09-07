@@ -13,7 +13,7 @@ pub enum Operation<'a, T> {
     Subtract,
     Multiply,
     Divide,
-    Power(T),
+    Power,
     Negate,
     Sine,
     Cosine,
@@ -85,8 +85,17 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
         Self::new(Operation::Divide, vec![numerator, denominator])
     }
 
-    pub fn new_power(base: Self, exponent: T) -> Self {
-        Self::new(Operation::Power(exponent), vec![base])
+    pub fn new_power(base: Self, exponent: Self) -> Self {
+        let negated_constant = match (&exponent.operation, exponent.operands.as_slice()) {
+            (Operation::Negate, [operand]) => operand.constant_value().map(|value| -value),
+            _ => None,
+        };
+        let exponent = match negated_constant {
+            Some(value) => Self::new_const(value),
+            None => exponent,
+        };
+
+        Self::new(Operation::Power, vec![base, exponent])
     }
 
     pub fn new_negate(operand: Self) -> Self {
@@ -154,6 +163,8 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
     }
 
     pub fn derive(&self, by_var: &str) -> Self {
+        let two = T::from(2).expect("2 must be representable by floating-point types");
+
         match &self.operation {
             Operation::Constant(_) => Self::new_const(T::zero()),
             Operation::Variable(name) => {
@@ -188,20 +199,31 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     Self::new_multiply((*denominator).clone(), (*denominator).clone()),
                 )
             }
-            Operation::Power(exponent) => {
-                let (base,) = self.unary_operands(Operation::Power(*exponent)).unwrap();
-                if *exponent == T::zero() {
-                    Self::new_const(T::zero())
-                } else if *exponent == T::one() {
-                    base.derive(by_var)
-                } else {
-                    Self::new_multiply(
+            Operation::Power => {
+                let (base, exponent) = self.binary_operands(Operation::Power).unwrap();
+                match exponent.constant_value() {
+                    Some(value) if value == T::zero() => Self::new_const(T::zero()),
+                    Some(value) if value == T::one() => base.derive(by_var),
+                    Some(value) => Self::new_multiply(
                         Self::new_multiply(
-                            Self::new_const(*exponent),
-                            Self::new_power(base.clone(), *exponent - T::one()),
+                            Self::new_const(value),
+                            Self::new_power(
+                                base.clone(),
+                                Self::new_const(value - T::one()),
+                            ),
                         ),
                         base.derive(by_var),
-                    )
+                    ),
+                    None => Self::new_multiply(
+                        self.clone(),
+                        Self::new_add(
+                            Self::new_multiply(exponent.derive(by_var), Self::new_ln(base.clone())),
+                            Self::new_multiply(
+                                exponent.clone(),
+                                Self::new_divide(base.derive(by_var), base.clone()),
+                            ),
+                        ),
+                    ),
                 }
             }
             Operation::Negate => {
@@ -223,7 +245,10 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let (operand,) = self.unary_operands(Operation::Tangent).unwrap();
                 Self::new_divide(
                     operand.derive(by_var),
-                    Self::new_power(Self::new_cos(operand.clone()), T::one() + T::one()),
+                    Self::new_power(
+                        Self::new_cos(operand.clone()),
+                        Self::new_const(two),
+                    ),
                 )
             }
             Operation::ArcSine => {
@@ -232,7 +257,10 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     operand.derive(by_var),
                     Self::new_sqrt(Self::new_subtract(
                         Self::new_const(T::one()),
-                        Self::new_power(operand.clone(), T::one() + T::one()),
+                        Self::new_power(
+                            operand.clone(),
+                            Self::new_const(two),
+                        ),
                     )),
                 )
             }
@@ -242,7 +270,10 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     Self::new_negate(operand.derive(by_var)),
                     Self::new_sqrt(Self::new_subtract(
                         Self::new_const(T::one()),
-                        Self::new_power(operand.clone(), T::one() + T::one()),
+                        Self::new_power(
+                            operand.clone(),
+                            Self::new_const(two),
+                        ),
                     )),
                 )
             }
@@ -252,7 +283,10 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     operand.derive(by_var),
                     Self::new_add(
                         Self::new_const(T::one()),
-                        Self::new_power(operand.clone(), T::one() + T::one()),
+                        Self::new_power(
+                            operand.clone(),
+                            Self::new_const(two),
+                        ),
                     ),
                 )
             }
@@ -268,7 +302,10 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let (operand,) = self.unary_operands(Operation::HyperbolicTangent).unwrap();
                 Self::new_divide(
                     operand.derive(by_var),
-                    Self::new_power(Self::new_cosh(operand.clone()), T::one() + T::one()),
+                    Self::new_power(
+                        Self::new_cosh(operand.clone()),
+                        Self::new_const(two),
+                    ),
                 )
             }
             Operation::Sign => Self::new_const(T::zero()),
@@ -285,7 +322,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 Self::new_divide(
                     operand.derive(by_var),
                     Self::new_multiply(
-                        Self::new_const(T::one() + T::one()),
+                        Self::new_const(two),
                         Self::new_sqrt(operand.clone()),
                     ),
                 )
@@ -325,9 +362,9 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let (numerator, denominator) = self.binary_operands(Operation::Divide).unwrap();
                 Self::simplify_quotient(numerator.simplify(), denominator.simplify())
             }
-            Operation::Power(exponent) => {
-                let (base,) = self.unary_operands(Operation::Power(*exponent)).unwrap();
-                Self::simplify_power(base.simplify(), *exponent)
+            Operation::Power => {
+                let (base, exponent) = self.binary_operands(Operation::Power).unwrap();
+                Self::simplify_power(base.simplify(), exponent.simplify())
             }
             Operation::Negate => {
                 let (operand,) = self.unary_operands(Operation::Negate).unwrap();
@@ -439,11 +476,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
             }
             Operation::NaturalLogarithm => {
                 let (operand,) = self.unary_operands(Operation::NaturalLogarithm).unwrap();
-                let operand = operand.simplify();
-                match operand.constant_value() {
-                    Some(value) => Self::new_const(value.ln()),
-                    None => Self::new_ln(operand),
-                }
+                Self::simplify_natural_logarithm(operand.simplify())
             }
             Operation::CommonLogarithm => {
                 let (operand,) = self.unary_operands(Operation::CommonLogarithm).unwrap();
@@ -560,23 +593,51 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
     fn simplify_quotient(numerator: Self, denominator: Self) -> Self {
         match (numerator.constant_value(), denominator.constant_value()) {
             (Some(numerator), Some(denominator)) => Self::new_const(numerator / denominator),
+            (Some(value), _) if value == T::zero() => Self::new_const(T::zero()),
+            _ if numerator == denominator => Self::new_const(T::one()),
             (_, Some(value)) if value == T::one() => numerator,
             (_, Some(value)) if value == -T::one() => Self::simplify_negation(numerator),
             _ => Self::new_divide(numerator, denominator),
         }
     }
 
-    fn simplify_power(base: Self, exponent: T) -> Self {
-        if exponent == T::zero() {
-            return Self::new_const(T::one());
-        }
-        if exponent == T::one() {
-            return base;
+    fn simplify_power(base: Self, exponent: Self) -> Self {
+        if let Some(exponent_value) = exponent.constant_value() {
+            if exponent_value == T::zero() {
+                return Self::new_const(T::one());
+            }
+            if exponent_value == T::one() {
+                return base;
+            }
+
+            if let (Operation::Power, [inner_base, inner_exponent]) =
+                (&base.operation, base.operands.as_slice())
+            {
+                if let Some(inner_exponent) = inner_exponent.constant_value() {
+                    return Self::simplify_power(
+                        inner_base.clone(),
+                        Self::new_const(inner_exponent * exponent_value),
+                    );
+                }
+            }
+
+            if let Some(base_value) = base.constant_value() {
+                return Self::new_const(base_value.powf(exponent_value));
+            }
         }
 
-        match base.constant_value() {
-            Some(value) => Self::new_const(value.powf(exponent)),
-            None => Self::new_power(base, exponent),
+        Self::new_power(base, exponent)
+    }
+
+    fn simplify_natural_logarithm(operand: Self) -> Self {
+        match (&operand.operation, operand.operands.as_slice()) {
+            (Operation::Power, [base, exponent]) => {
+                Self::simplify_product(exponent.clone(), Self::new_ln(base.clone()))
+            }
+            _ => match operand.constant_value() {
+                Some(value) => Self::new_const(value.ln()),
+                None => Self::new_ln(operand),
+            },
         }
     }
 
@@ -633,9 +694,9 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let (numerator, denominator) = self.binary_operands(Operation::Divide)?;
                 Ok(numerator.evaluate(args)? / denominator.evaluate(args)?)
             }
-            Operation::Power(exponent) => {
-                let (base,) = self.unary_operands(Operation::Power(*exponent))?;
-                Ok(base.evaluate(args)?.powf(*exponent))
+            Operation::Power => {
+                let (base, exponent) = self.binary_operands(Operation::Power)?;
+                Ok(base.evaluate(args)?.powf(exponent.evaluate(args)?))
             }
             Operation::Negate => {
                 let (operand,) = self.unary_operands(Operation::Negate)?;
@@ -742,7 +803,7 @@ impl<T: Float> Display for Operation<'_, T> {
             Operation::Subtract => write!(formatter, "-"),
             Operation::Multiply => write!(formatter, "*"),
             Operation::Divide => write!(formatter, "/"),
-            Operation::Power(_) => write!(formatter, "^"),
+            Operation::Power => write!(formatter, "^"),
             Operation::Negate => write!(formatter, "-"),
             Operation::Sine => write!(formatter, "sin"),
             Operation::Cosine => write!(formatter, "cos"),
@@ -774,7 +835,9 @@ impl<T: Float + Display> Display for MathExpr<'_, T> {
             (Operation::Divide, [numerator, denominator]) => {
                 write!(formatter, "({numerator} / {denominator})")
             }
-            (Operation::Power(exponent), [base]) => write!(formatter, "({base} ^ {exponent})"),
+            (Operation::Power, [base, exponent]) => {
+                write!(formatter, "({base} ^ {exponent})")
+            }
             (Operation::Negate, [operand]) => write!(formatter, "(-{operand})"),
             (Operation::Sine, [operand]) => write!(formatter, "sin({operand})"),
             (Operation::Cosine, [operand]) => write!(formatter, "cos({operand})"),

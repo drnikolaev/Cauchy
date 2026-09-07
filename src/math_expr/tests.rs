@@ -697,6 +697,13 @@ fn simplify_logarithm_of_power() {
 }
 
 #[test]
+fn simplify_common_logarithm_of_power() {
+    let expression = MathExpr::<f64>::parse("log10(x ^ y)").unwrap();
+
+    assert_eq!(expression.simplify().to_string(), "(y * log10(x))");
+}
+
+#[test]
 fn simplify_exp_constant() {
     assert_eq!(
         MathExpr::<f64>::parse("exp(0)")

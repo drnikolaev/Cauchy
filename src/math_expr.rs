@@ -480,11 +480,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
             }
             Operation::CommonLogarithm => {
                 let (operand,) = self.unary_operands(Operation::CommonLogarithm).unwrap();
-                let operand = operand.simplify();
-                match operand.constant_value() {
-                    Some(value) => Self::new_const(value.log10()),
-                    None => Self::new_log10(operand),
-                }
+                Self::simplify_common_logarithm(operand.simplify())
             }
         }
     }
@@ -637,6 +633,18 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
             _ => match operand.constant_value() {
                 Some(value) => Self::new_const(value.ln()),
                 None => Self::new_ln(operand),
+            },
+        }
+    }
+
+    fn simplify_common_logarithm(operand: Self) -> Self {
+        match (&operand.operation, operand.operands.as_slice()) {
+            (Operation::Power, [base, exponent]) => {
+                Self::simplify_product(exponent.clone(), Self::new_log10(base.clone()))
+            }
+            _ => match operand.constant_value() {
+                Some(value) => Self::new_const(value.log10()),
+                None => Self::new_log10(operand),
             },
         }
     }

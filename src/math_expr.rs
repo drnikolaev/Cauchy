@@ -30,6 +30,7 @@ pub enum Operation<'a, T> {
     SquareRoot,
     NaturalLogarithm,
     CommonLogarithm,
+    ImmediateIf,
 }
 
 #[derive(Debug, PartialEq)]
@@ -162,6 +163,13 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
         Self::new(Operation::CommonLogarithm, vec![operand])
     }
 
+    pub fn new_iif(check: Self, if_less_than_zero: Self, otherwise: Self) -> Self {
+        Self::new(
+            Operation::ImmediateIf,
+            vec![check, if_less_than_zero, otherwise],
+        )
+    }
+
     pub fn derive(&self, by_var: &str) -> Self {
         let two = T::from(2).expect("2 must be representable by floating-point types");
 
@@ -207,10 +215,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     Some(value) => Self::new_multiply(
                         Self::new_multiply(
                             Self::new_const(value),
-                            Self::new_power(
-                                base.clone(),
-                                Self::new_const(value - T::one()),
-                            ),
+                            Self::new_power(base.clone(), Self::new_const(value - T::one())),
                         ),
                         base.derive(by_var),
                     ),
@@ -245,10 +250,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let (operand,) = self.unary_operands(Operation::Tangent).unwrap();
                 Self::new_divide(
                     operand.derive(by_var),
-                    Self::new_power(
-                        Self::new_cos(operand.clone()),
-                        Self::new_const(two),
-                    ),
+                    Self::new_power(Self::new_cos(operand.clone()), Self::new_const(two)),
                 )
             }
             Operation::ArcSine => {
@@ -257,10 +259,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     operand.derive(by_var),
                     Self::new_sqrt(Self::new_subtract(
                         Self::new_const(T::one()),
-                        Self::new_power(
-                            operand.clone(),
-                            Self::new_const(two),
-                        ),
+                        Self::new_power(operand.clone(), Self::new_const(two)),
                     )),
                 )
             }
@@ -270,10 +269,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     Self::new_negate(operand.derive(by_var)),
                     Self::new_sqrt(Self::new_subtract(
                         Self::new_const(T::one()),
-                        Self::new_power(
-                            operand.clone(),
-                            Self::new_const(two),
-                        ),
+                        Self::new_power(operand.clone(), Self::new_const(two)),
                     )),
                 )
             }
@@ -283,10 +279,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     operand.derive(by_var),
                     Self::new_add(
                         Self::new_const(T::one()),
-                        Self::new_power(
-                            operand.clone(),
-                            Self::new_const(two),
-                        ),
+                        Self::new_power(operand.clone(), Self::new_const(two)),
                     ),
                 )
             }
@@ -302,10 +295,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let (operand,) = self.unary_operands(Operation::HyperbolicTangent).unwrap();
                 Self::new_divide(
                     operand.derive(by_var),
-                    Self::new_power(
-                        Self::new_cosh(operand.clone()),
-                        Self::new_const(two),
-                    ),
+                    Self::new_power(Self::new_cosh(operand.clone()), Self::new_const(two)),
                 )
             }
             Operation::Sign => Self::new_const(T::zero()),
@@ -321,10 +311,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let (operand,) = self.unary_operands(Operation::SquareRoot).unwrap();
                 Self::new_divide(
                     operand.derive(by_var),
-                    Self::new_multiply(
-                        Self::new_const(two),
-                        Self::new_sqrt(operand.clone()),
-                    ),
+                    Self::new_multiply(Self::new_const(two), Self::new_sqrt(operand.clone())),
                 )
             }
             Operation::NaturalLogarithm => {
@@ -337,6 +324,15 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 Self::new_divide(
                     operand.derive(by_var),
                     Self::new_multiply(operand.clone(), Self::new_const(ten.ln())),
+                )
+            }
+            Operation::ImmediateIf => {
+                let (check, if_less_than_zero, otherwise) =
+                    self.ternary_operands(Operation::ImmediateIf).unwrap();
+                Self::new_iif(
+                    check.clone(),
+                    if_less_than_zero.derive(by_var),
+                    otherwise.derive(by_var),
                 )
             }
         }
@@ -481,6 +477,19 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
             Operation::CommonLogarithm => {
                 let (operand,) = self.unary_operands(Operation::CommonLogarithm).unwrap();
                 Self::simplify_common_logarithm(operand.simplify())
+            }
+            Operation::ImmediateIf => {
+                let (check, if_less_than_zero, otherwise) =
+                    self.ternary_operands(Operation::ImmediateIf).unwrap();
+                let check = check.simplify();
+
+                match check.constant_value() {
+                    Some(value) if value < T::zero() => if_less_than_zero.simplify(),
+                    Some(_) => otherwise.simplify(),
+                    None => {
+                        Self::new_iif(check, if_less_than_zero.simplify(), otherwise.simplify())
+                    }
+                }
             }
         }
     }
@@ -770,6 +779,15 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let (operand,) = self.unary_operands(Operation::CommonLogarithm)?;
                 Ok(operand.evaluate(args)?.log10())
             }
+            Operation::ImmediateIf => {
+                let (check, if_less_than_zero, otherwise) =
+                    self.ternary_operands(Operation::ImmediateIf)?;
+                if check.evaluate(args)? < T::zero() {
+                    if_less_than_zero.evaluate(args)
+                } else {
+                    otherwise.evaluate(args)
+                }
+            }
         }
     }
 
@@ -796,6 +814,20 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
             operands => Err(EvaluationError::InvalidOperandCount {
                 operation,
                 expected: 2,
+                actual: operands.len(),
+            }),
+        }
+    }
+
+    fn ternary_operands(
+        &self,
+        operation: Operation<'a, T>,
+    ) -> Result<(&Self, &Self, &Self), EvaluationError<'a, T>> {
+        match self.operands.as_slice() {
+            [first, second, third] => Ok((first, second, third)),
+            operands => Err(EvaluationError::InvalidOperandCount {
+                operation,
+                expected: 3,
                 actual: operands.len(),
             }),
         }
@@ -828,6 +860,7 @@ impl<T: Float> Display for Operation<'_, T> {
             Operation::SquareRoot => write!(formatter, "sqrt"),
             Operation::NaturalLogarithm => write!(formatter, "ln"),
             Operation::CommonLogarithm => write!(formatter, "log10"),
+            Operation::ImmediateIf => write!(formatter, "iif"),
         }
     }
 }
@@ -862,6 +895,9 @@ impl<T: Float + Display> Display for MathExpr<'_, T> {
             (Operation::SquareRoot, [operand]) => write!(formatter, "sqrt({operand})"),
             (Operation::NaturalLogarithm, [operand]) => write!(formatter, "ln({operand})"),
             (Operation::CommonLogarithm, [operand]) => write!(formatter, "log10({operand})"),
+            (Operation::ImmediateIf, [check, if_less_than_zero, otherwise]) => {
+                write!(formatter, "iif({check}, {if_less_than_zero}, {otherwise})")
+            }
             _ => Err(std::fmt::Error),
         }
     }

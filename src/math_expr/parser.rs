@@ -175,6 +175,17 @@ where
         self.skip_whitespace();
 
         if self.consume_symbol('(') {
+            if name == "iif" {
+                let check = self.parse_expression()?;
+                self.expect_symbol(',')?;
+                let if_less_than_zero = self.parse_expression()?;
+                self.expect_symbol(',')?;
+                let otherwise = self.parse_expression()?;
+                self.expect_symbol(')')?;
+
+                return Ok(MathExpr::new_iif(check, if_less_than_zero, otherwise));
+            }
+
             let operand = self.parse_expression()?;
             self.expect_symbol(')')?;
 

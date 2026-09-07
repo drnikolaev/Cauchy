@@ -607,6 +607,41 @@ fn parse_log10_and_formatting() {
 }
 
 #[test]
+fn parse_and_evaluate_iif() {
+    let expression = MathExpr::<f64>::parse("iif(x, -x, x ^ 2)").unwrap();
+
+    assert_eq!(expression.to_string(), "iif(x, (-x), (x ^ 2))");
+    assert_eq!(expression.evaluate(&HashMap::from([("x", -3.0)])), Ok(3.0));
+    assert_eq!(expression.evaluate(&HashMap::from([("x", 2.0)])), Ok(4.0));
+    assert_eq!(expression.evaluate(&HashMap::from([("x", 0.0)])), Ok(0.0));
+}
+
+#[test]
+fn evaluate_iif_lazily() {
+    let expression = MathExpr::<f64>::parse("iif(x, undefined, 42)").unwrap();
+
+    assert_eq!(expression.evaluate(&HashMap::from([("x", 1.0)])), Ok(42.0));
+}
+
+#[test]
+fn simplify_iif_with_constant_condition() {
+    assert_eq!(
+        MathExpr::<f64>::parse("iif(-1, x, undefined)")
+            .unwrap()
+            .simplify()
+            .to_string(),
+        "x"
+    );
+    assert_eq!(
+        MathExpr::<f64>::parse("iif(0, undefined, x)")
+            .unwrap()
+            .simplify()
+            .to_string(),
+        "x"
+    );
+}
+
+#[test]
 fn simplify_repeated_terms() {
     let expression = MathExpr::<f64>::parse("x + x + x + x").unwrap();
     let simplified = expression.simplify();

@@ -4,7 +4,6 @@ use std::ffi::{c_char, c_double, c_int};
 use std::fmt::{Display, Formatter};
 
 unsafe extern "C" {
-    fn cauchy_daxpy(n: c_int, alpha: c_double, x: *const c_double, y: *mut c_double);
     fn cauchy_fortran_evaluate_math_expr(
         source: *const c_char,
         source_len: c_int,
@@ -36,8 +35,9 @@ unsafe extern "C" {
 ///
 /// # Safety
 ///
-/// `source` must address `source_len` readable bytes, and `answer` must point
-/// to writable storage for one `c_double`.
+/// `source` must address `source_len` readable bytes, `x` must address `x_len`
+/// readable doubles (or may be null when `x_len` is zero), and `answer` must
+/// point to writable storage for one `c_double`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cauchy_evaluate_math_expr(
     source: *const c_char,
@@ -46,7 +46,12 @@ pub unsafe extern "C" fn cauchy_evaluate_math_expr(
     x_len: c_int,
     answer: *mut c_double,
 ) -> c_int {
-    if source.is_null() || answer.is_null() || source_len < 0 {
+    if source.is_null()
+        || answer.is_null()
+        || source_len < 0
+        || x_len < 0
+        || (x_len > 0 && x.is_null())
+    {
         return -1;
     }
 
@@ -59,8 +64,20 @@ pub unsafe extern "C" fn cauchy_evaluate_math_expr(
         Ok(expression) => expression,
         Err(_) => return 1,
     };
-    // let x = unsafe { std::slice::from_raw_parts(x, x_len as usize) };
-    let args_map = HashMap::new();
+    let x = if x_len == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(x, x_len as usize) }
+    };
+    let names: Vec<_> = (0..x.len()).map(|index| format!("x{index}")).collect();
+    let mut args_map: HashMap<&str, f64> = names
+        .iter()
+        .zip(x)
+        .map(|(name, &value)| (name.as_str(), value))
+        .collect();
+    if x.len() == 1 {
+        args_map.insert("x", x[0]);
+    }
     let value = match expression.evaluate(&args_map) {
         Ok(value) => value,
         Err(_) => return 2,
@@ -91,20 +108,10 @@ impl Display for MatrixInverseError {
 
 impl std::error::Error for MatrixInverseError {}
 
-/// Computes `y := alpha * x + y` using the BLAS DAXPY routine.
-pub fn daxpy(alpha: f64, x: &[f64], y: &mut [f64]) {
-    assert_eq!(x.len(), y.len(), "x and y must have the same length");
-    if x.is_empty() {
-        return;
-    }
-
-    let n = c_int::try_from(x.len()).expect("vectors are too long for the BLAS integer ABI");
-    unsafe {
-        cauchy_daxpy(n, alpha, x.as_ptr(), y.as_mut_ptr());
-    }
-}
 
 /// Sends an expression through Fortran and back to Rust for evaluation.
+/// Variables `x0`, `x1`, ... address vector components; a single component
+/// can also be referred to as `x`.
 pub fn evaluate_math_expr_from_fortran(source: &str, x: &[f64]) -> Result<f64, c_int> {
     let source_len = c_int::try_from(source.len()).map_err(|_| -3)?;
     let x_len = c_int::try_from(x.len()).map_err(|_| -4)?;
@@ -229,19 +236,9 @@ pub fn matrix_inverse(matrix: &[f64], order: usize) -> Result<Vec<f64>, MatrixIn
 #[cfg(test)]
 mod tests {
     use super::{
-        MatrixInverseError, daxpy, evaluate_math_expr_from_fortran, matrix_exp, matrix_inverse,
+        MatrixInverseError, evaluate_math_expr_from_fortran, matrix_exp, matrix_inverse,
     };
-
-    #[test]
-    fn daxpy_updates_output_vector() {
-        let x = [2.0, -1.0, 4.0];
-        let mut y = [1.0, 3.0, -2.0];
-
-        daxpy(-0.5, &x, &mut y);
-
-        assert_eq!(y, [0.0, 3.5, -4.0]);
-    }
-
+    
     #[test]
     fn fortran_calls_rust_math_expr_evaluate() {
         let answer = evaluate_math_expr_from_fortran("2 + 3 * 5",&[5.0]).unwrap();

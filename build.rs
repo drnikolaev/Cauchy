@@ -38,20 +38,14 @@ fn link_fortran_runtime(compiler: &OsStr, target_os: &str) {
 
 fn main() {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR must be set by Cargo"));
-    let daxpy_object = out_dir.join("daxpy.o");
     let evaluate_math_expr_object = out_dir.join("evaluate_math_expr.o");
     let matrix_exp_object = out_dir.join("matrix_exp.o");
     let matrix_inverse_object = out_dir.join("matrix_inverse.o");
+    let sengl_object = out_dir.join("sengl.o");
     let library = out_dir.join("libcauchy_fortran.a");
     let fortran_compiler = env::var_os("FC").unwrap_or_else(|| "gfortran".into());
     let archiver = env::var_os("AR").unwrap_or_else(|| "ar".into());
 
-    run(
-        Command::new(&fortran_compiler)
-            .args(["-c", "-O2", "-fPIC", "ftn/daxpy.f", "-o"])
-            .arg(&daxpy_object),
-        "compile ftn/daxpy.f",
-    );
     run(
         Command::new(&fortran_compiler)
             .args(["-c", "-O2", "-fPIC", "ftn/evaluate_math_expr.f", "-o"])
@@ -71,20 +65,26 @@ fn main() {
         "compile ftn/matrix_inverse.f",
     );
     run(
+        Command::new(&fortran_compiler)
+            .args(["-c", "-O2", "-fPIC", "-frecursive", "ftn/sengl.f", "-o"])
+            .arg(&sengl_object),
+        "compile ftn/sengl.f",
+    );
+    run(
         Command::new(archiver)
             .args(["crs"])
             .arg(&library)
-            .arg(&daxpy_object)
             .arg(&evaluate_math_expr_object)
             .arg(&matrix_exp_object)
-            .arg(&matrix_inverse_object),
+            .arg(&matrix_inverse_object)
+            .arg(&sengl_object),
         "archive the Fortran objects",
     );
 
-    println!("cargo:rerun-if-changed=ftn/daxpy.f");
     println!("cargo:rerun-if-changed=ftn/evaluate_math_expr.f");
     println!("cargo:rerun-if-changed=ftn/matrix_exp.f");
     println!("cargo:rerun-if-changed=ftn/matrix_inverse.f");
+    println!("cargo:rerun-if-changed=ftn/sengl.f");
     println!("cargo:rerun-if-env-changed=FC");
     println!("cargo:rerun-if-env-changed=AR");
     println!("cargo:rustc-link-search=native={}", out_dir.display());

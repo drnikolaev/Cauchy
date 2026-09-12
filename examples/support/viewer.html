@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>__SYSTEM__ __SHAPE__ · cauchy-ode</title>
+<style>
+  :root { color-scheme: dark; --bg:#09121c; --panel:#101d2a; --line:#243442; --text:#eaf0ee; --muted:#9aadb9; --cyan:#67dbdd; --gold:#eab877; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  button,input,select { font:inherit; }
+  button,select { color:var(--text); background:transparent; border:1px solid var(--line); border-radius:7px; padding:8px 13px; cursor:pointer; }
+  button:hover,select:hover { border-color:#6c929f; background:#18303b; }
+  button:focus-visible,select:focus-visible,input:focus-visible,canvas:focus-visible { outline:2px solid var(--cyan); outline-offset:4px; }
+  button[aria-pressed="true"] { color:var(--cyan); background:#16303a; border-color:#37616b; }
+  header { max-width:1560px; margin:auto; padding:27px 42px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); }
+  .brand { font:italic 29px Georgia,serif; letter-spacing:-1px; }
+  .brand span { color:var(--cyan); }
+  .eyebrow { font-size:10px; letter-spacing:2.2px; text-transform:uppercase; color:var(--muted); }
+  .header-note { display:flex; align-items:center; gap:10px; font-size:11px; color:var(--muted); }
+  .dot { width:6px; height:6px; border-radius:50%; background:var(--cyan); box-shadow:0 0 12px #67dbdd77; }
+  main { max-width:1560px; margin:auto; padding:0 42px; }
+  .workspace { display:grid; grid-template-columns:270px minmax(0,1fr); min-height:590px; height:min(72vh,790px); }
+  .workspace:has(.continuation) { min-height:720px; }
+  aside { display:flex; flex-direction:column; justify-content:center; padding:40px 20px 38px 0; position:relative; z-index:1; }
+  h1 { font:normal clamp(43px,4.3vw,65px)/1.04 Georgia,serif; letter-spacing:-2.5px; margin:20px 0; }
+  h1 em { color:var(--cyan); font-weight:normal; }
+  .description { color:var(--muted); max-width:230px; line-height:1.75; font-size:13px; }
+  .equations { margin:28px 0 24px; padding:18px 0 18px 17px; border-left:2px solid #345865; font:italic 19px/1.85 Georgia,serif; letter-spacing:.4px; }
+  .equations span { color:var(--cyan); }
+  .equations .continuation { padding-left:26px; }
+  .equations:has(.continuation) { font-size:17px; line-height:1.6; margin:18px 0; padding-top:10px; padding-bottom:10px; }
+  .parameters { display:grid; grid-template-columns:repeat(3,max-content); gap:14px 24px; }
+  .parameters div { display:flex; flex-direction:column; gap:4px; }
+  .parameters b { font:normal 18px Georgia,serif; }
+  .parameters small { color:var(--muted); font-size:10px; letter-spacing:1px; }
+  .initial { color:var(--muted); font-size:11px; margin-top:30px; }
+  .initial code { color:#d3dedf; }
+  .scene { position:relative; min-width:0; overflow:hidden; }
+  canvas { display:block; width:100%; height:100%; touch-action:none; cursor:grab; }
+  canvas:active { cursor:grabbing; }
+  .scene-top { position:absolute; top:25px; left:20px; right:0; display:flex; align-items:center; justify-content:space-between; gap:10px; pointer-events:none; }
+  .views { display:flex; gap:5px; pointer-events:auto; }
+  .views button { padding:5px 11px; font-size:11px; background:#0e1b26d9; }
+  .scene-bottom { position:absolute; bottom:23px; left:20px; right:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--muted); font-size:10px; pointer-events:none; }
+  .legend { display:flex; align-items:center; gap:8px; }
+  .gradient { width:70px; height:3px; background:linear-gradient(90deg,#45cee0,#f3b86e); border-radius:2px; }
+  .controls { border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:21px 0; display:grid; grid-template-columns:auto minmax(110px,1fr) auto; align-items:center; gap:25px; }
+  .playback,.actions { display:flex; align-items:center; gap:8px; }
+  #play { min-width:95px; background:var(--cyan); border-color:var(--cyan); color:#10232d; font-weight:600; }
+  #play:hover { background:#9aeeee; }
+  #speed { padding:8px 4px; font-size:12px; }
+  .timeline { display:flex; flex-direction:column; gap:6px; }
+  .time-label { display:flex; justify-content:space-between; font-size:10px; font-variant-numeric:tabular-nums; color:var(--muted); }
+  .time-label output { color:var(--text); }
+  input[type="range"] { width:100%; height:4px; margin:5px 0; accent-color:var(--cyan); cursor:pointer; }
+  .settings { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:15px; padding:18px 0; }
+  .toggles { display:flex; align-items:center; gap:23px; color:var(--muted); font-size:12px; }
+  .toggles label { display:flex; align-items:center; gap:7px; cursor:pointer; }
+  input[type="checkbox"] { accent-color:var(--cyan); }
+  .stats { display:flex; flex-wrap:wrap; gap:24px; color:var(--muted); font-size:11px; }
+  .stats strong { color:#c5d6dd; font-weight:500; }
+  footer { display:flex; justify-content:space-between; gap:20px; padding:25px 0 30px; color:#728997; font-size:10px; border-top:1px solid #182936; }
+  footer span:last-child { color:#9cafb9; }
+  #status { min-height:18px; font-size:11px; color:var(--gold); }
+  @media (min-width:1400px) { .workspace { grid-template-columns:310px minmax(0,1fr); } }
+  @media (max-width:850px) {
+    header { padding:19px 22px; } main { padding:0 22px; }
+    .workspace { grid-template-columns:210px minmax(0,1fr); height:590px; min-height:0; }
+    aside { padding-right:5px; } h1 { font-size:44px; } .description { font-size:12px; }
+    .equations { font-size:16px; } .scene-top { left:5px; } .scene-top>.eyebrow { display:none; }
+    .scene-bottom { left:5px; } .scene-bottom>.hint { display:none; }
+    .controls { gap:14px; } .actions button { padding:8px; font-size:11px; }
+  }
+  @media (max-width:600px) {
+    .header-note { font-size:9px; } .brand { font-size:25px; }
+    .workspace { display:flex; flex-direction:column; height:auto; }
+    .workspace:has(.continuation) { min-height:0; }
+    aside { padding:25px 0 5px; display:grid; grid-template-columns:1fr 1fr; gap:0 15px; }
+    aside>.eyebrow { grid-column:1/-1; } h1 { font-size:40px; margin:14px 0; }
+    .description { display:none; } .equations { margin:15px 0; font-size:15px; padding:5px 0 5px 13px; }
+    .equations:has(.continuation) { grid-column:1/-1; }
+    .parameters { gap:23px; } .parameters b { font-size:16px; } .initial { margin:7px 0 0; font-size:10px; }
+    .scene { height:420px; } .scene-top { top:20px; } .scene-bottom { bottom:15px; }
+    .controls { grid-template-columns:auto 1fr; gap:16px; padding:17px 0; }
+    .actions { grid-column:1/-1; justify-content:flex-end; } .toggles { gap:12px; font-size:11px; }
+    .stats { gap:13px; } footer { flex-direction:column; gap:5px; padding:18px 0; }
+  }
+</style>
+</head>
+<body>
+<header><div class="brand">cauchy-ode<span>.</span></div><div class="header-note"><span class="dot"></span> A numerical playground</div></header>
+<main>
+  <section class="workspace" aria-label="__SYSTEM__ attractor visualization">
+    <aside>
+      <div class="eyebrow">__INDEX__ / Strange attractors</div>
+      <h1>__SYSTEM__<br><em>__SHAPE__.</em></h1>
+      <p class="description">__DESCRIPTION__</p>
+      <div class="equations" aria-label="__EQUATION_LABEL__">
+        __EQUATIONS_HTML__
+      </div>
+      <div class="parameters">__PARAMETERS_HTML__</div>
+      <div class="initial">Initial state <code>__INITIAL__</code><br>Local tolerance <code>10⁻⁹</code></div>
+    </aside>
+    <div class="scene">
+      <canvas id="plot" tabindex="0" aria-label="Interactive 3D __SYSTEM__ trajectory. Drag or use arrow keys to rotate, scroll or use plus and minus to zoom. Space toggles playback, R resets the view.">Your browser needs Canvas support to display the __SYSTEM__ attractor.</canvas>
+      <div class="scene-top"><span class="eyebrow">Phase space</span><div class="views" role="group" aria-label="Projection">
+        <button data-view="3d" aria-pressed="true">3D</button><button data-view="xz" aria-pressed="false">x–z</button><button data-view="xy" aria-pressed="false">x–y</button><button data-view="yz" aria-pressed="false">y–z</button>
+      </div></div>
+      <div class="scene-bottom"><span class="hint">Drag to orbit · Scroll to zoom</span><div class="legend"><span>Low z</span><span class="gradient"></span><span>High z</span></div></div>
+    </div>
+  </section>
+  <section class="controls" aria-label="Trajectory playback">
+    <div class="playback"><button id="play" aria-label="Replay trajectory">↻ Replay</button><select id="speed" aria-label="Playback speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="10">10×</option></select></div>
+    <div class="timeline"><div class="time-label"><label for="timeline">Simulation time</label><output id="time" for="timeline"></output></div><input id="timeline" type="range" min="0" max="60" step="0.01" value="60" aria-label="Simulation time"></div>
+    <div class="actions"><button id="reset">Reset view</button><button id="png">Save image ↗</button><button id="csv">CSV ↓</button></div>
+  </section>
+  <div class="settings"><div class="toggles"><label><input id="orbit" type="checkbox"> Auto orbit</label><label><input id="grid" type="checkbox" checked> Axes & grid</label><label><input id="transient" type="checkbox" checked> Hide transient</label></div><div class="stats"><span><strong id="count"></strong> computed points</span><span>Solver <strong>__METHOD__</strong></span></div></div>
+  <div id="status" role="status"></div>
+  <footer><span>Deterministic equations. Sensitive initial conditions.</span><span>Computed by cauchy-ode · Rust + Fortran</span></footer>
+</main>
+<script id="trajectory" type="application/json">__TRAJECTORY_DATA__</script>
+<script id="configuration" type="application/json">__VIEW_CONFIG__</script>
+<script>
+"use strict";
+(() => {
+  const points = JSON.parse(document.getElementById("trajectory").textContent);
+  const config = JSON.parse(document.getElementById("configuration").textContent);
+  const canvas = document.getElementById("plot"), ctx = canvas.getContext("2d");
+  const ui = Object.fromEntries(["play","speed","timeline","time","orbit","grid","transient","status"].map(id => [id, document.getElementById(id)]));
+  if (!ctx || points.length < 2) { ui.status.textContent = "Unable to display trajectory."; return; }
+  const endTime = points[points.length-1][0], transientTime = Math.min(config.transient, endTime/5);
+  const colors = Array.from({length:32}, (_, i) => {
+    const u = i/31;
+    return `rgb(${Math.round(69+174*u)},${Math.round(206-22*u)},${Math.round(224-114*u)})`;
+  });
+  const views = { "3d":config.camera, xz:[0,0], xy:[0,-Math.PI/2], yz:[-Math.PI/2,0] };
+  let yaw = views["3d"][0], pitch = views["3d"][1], zoom = 1, view = "3d";
+  let width = 1, height = 1, dirty = true, playing = false, cursor = endTime, previousFrame = null;
+  let pointer = null, lastX = 0, lastY = 0;
+  ui.timeline.max = endTime; ui.timeline.step = endTime/10000; ui.timeline.value = endTime;
+  document.getElementById("count").textContent = points.length.toLocaleString();
+  const beginTime = () => ui.transient.checked ? transientTime : 0;
+  const lowerBound = t => {
+    let lo=0, hi=points.length;
+    while (lo<hi) { const mid=(lo+hi)>>>1; if (points[mid][0]<t) lo=mid+1; else hi=mid; }
+    return Math.min(lo, points.length-1);
+  };
+  function syncTime() {
+    ui.timeline.min = beginTime(); ui.timeline.value = cursor;
+    ui.time.textContent = `${cursor.toFixed(2)} / ${endTime.toFixed(2)}`;
+    ui.play.textContent = playing ? "Ⅱ Pause" : cursor>=endTime ? "↻ Replay" : "▶ Play";
+    ui.play.setAttribute("aria-label", playing ? "Pause trajectory" : cursor>=endTime ? "Replay trajectory" : "Play trajectory");
+  }
+  function selectView(name) {
+    view=name; [yaw,pitch]=views[name]; zoom=1; ui.orbit.checked=false;
+    document.querySelectorAll("[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view===name)));
+    dirty=true;
+  }
+  function freeView() {
+    view="3d";
+    document.querySelectorAll("[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view==="3d")));
+  }
+  function resize() {
+    const rect=canvas.getBoundingClientRect(), ratio=Math.min(window.devicePixelRatio||1,2);
+    width=Math.max(1,rect.width); height=Math.max(1,rect.height);
+    canvas.width=Math.round(width*ratio); canvas.height=Math.round(height*ratio);
+    ctx.setTransform(ratio,0,0,ratio,0,0); dirty=true;
+  }
+  function render() {
+    ctx.fillStyle="#09121c"; ctx.fillRect(0,0,width,height);
+    const cy=Math.cos(yaw), sy=Math.sin(yaw), cp=Math.cos(pitch), sp=Math.sin(pitch);
+    const scale=Math.min(width,height)*0.38*zoom;
+    const project = (x,y,z) => {
+      x=(x-config.center[0])/config.scale; y=(y-config.center[1])/config.scale; z=(z-config.center[2])/config.scale;
+      const a=x*cy-y*sy, b=x*sy+y*cy, v=z*cp-b*sp, depth=z*sp+b*cp;
+      const perspective=view==="3d" ? 4/(4+depth) : 1;
+      return [width/2+a*scale*perspective, height*0.51-v*scale*perspective];
+    };
+    const segment = (a,b) => { const p=project(...a), q=project(...b); ctx.moveTo(...p); ctx.lineTo(...q); };
+    if (ui.grid.checked) {
+      ctx.beginPath(); ctx.strokeStyle="#213543"; ctx.lineWidth=0.6; ctx.globalAlpha=0.65;
+      const g=config.gridRange, floor=config.gridZ??0;
+      const axisMin=config.axisMin??0, pad=config.gridStep*0.2;
+      for (let n=-g;n<=g;n+=config.gridStep) { segment([n,-g,floor],[n,g,floor]); segment([-g,n,floor],[g,n,floor]); }
+      ctx.stroke(); ctx.globalAlpha=1;
+      ctx.beginPath(); ctx.strokeStyle="#49606c"; ctx.lineWidth=0.8;
+      segment([axisMin,0,0],[g+pad,0,0]); segment([0,axisMin,0],[0,g+pad,0]); segment([0,0,axisMin],[0,0,config.zMax+pad]); ctx.stroke();
+      ctx.font="italic 13px Georgia"; ctx.fillStyle="#8ca9b6";
+      for (const [label,p] of [["x",[g+2*pad,0,0]],["y",[0,g+2*pad,0]],["z",[0,0,config.zMax+2*pad]]]) { const [x,y]=project(...p); ctx.fillText(label,x+4,y-3); }
+    }
+    const start=lowerBound(beginTime()), last=lowerBound(cursor);
+    const paths=Array.from({length:32},()=>new Path2D());
+    const stride=Math.max(1,Math.ceil((last-start)/24000));
+    let prior=project(...points[start].slice(1));
+    for (let i=start+1;i<=last;) {
+      const point=points[Math.min(i,last)], next=project(point[1],point[2],point[3]);
+      const zMin=config.zMin??0, normalizedZ=(point[3]-zMin)/(config.zMax-zMin);
+      const bin=Math.max(0,Math.min(31,Math.floor(Math.pow(Math.max(0,normalizedZ),config.colorExponent)*31)));
+      paths[bin].moveTo(...prior); paths[bin].lineTo(...next); prior=next;
+      if (i===last) break;
+      i=Math.min(last,i+stride);
+    }
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    // A quiet halo under a fine line keeps densely wound trajectories legible.
+    for (const [lineWidth,alpha] of [[3,0.075],[0.85,0.77]]) {
+      ctx.lineWidth=lineWidth; ctx.globalAlpha=alpha;
+      paths.forEach((path,i)=>{ctx.strokeStyle=colors[i];ctx.stroke(path);});
+    }
+    ctx.globalAlpha=1;
+    const head=project(...points[last].slice(1));
+    const glow=ctx.createRadialGradient(...head,0,...head,11);
+    glow.addColorStop(0,"#f8edcda0"); glow.addColorStop(1,"#f8edcd00");
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(...head,11,0,2*Math.PI);ctx.fill();
+    ctx.fillStyle="#fff0cb";ctx.beginPath();ctx.arc(...head,2,0,2*Math.PI);ctx.fill();
+    dirty=false;
+  }
+  function togglePlayback() { if (!playing && cursor>=endTime) cursor=beginTime(); playing=!playing; dirty=true; syncTime(); }
+  function frame(now) {
+    const delta=previousFrame===null ? 0 : Math.min((now-previousFrame)/1000,0.1); previousFrame=now;
+    if (playing) { cursor=Math.min(endTime,cursor+delta*Number(ui.speed.value)); if(cursor>=endTime) playing=false; dirty=true; syncTime(); }
+    if (ui.orbit.checked && pointer===null) { yaw+=delta*0.12; dirty=true; }
+    if (dirty) render();
+    requestAnimationFrame(frame);
+  }
+  ui.play.addEventListener("click",togglePlayback);
+  ui.timeline.addEventListener("input",()=>{cursor=Number(ui.timeline.value);playing=false;dirty=true;syncTime();});
+  ui.grid.addEventListener("change",()=>{dirty=true;});
+  ui.transient.addEventListener("change",()=>{cursor=Math.max(cursor,beginTime());dirty=true;syncTime();});
+  ui.orbit.addEventListener("change",()=>{if(ui.orbit.checked) freeView();dirty=true;});
+  document.querySelectorAll("[data-view]").forEach(button=>button.addEventListener("click",()=>selectView(button.dataset.view)));
+  document.getElementById("reset").addEventListener("click",()=>selectView("3d"));
+  canvas.addEventListener("pointerdown",event=>{pointer=event.pointerId;lastX=event.clientX;lastY=event.clientY;canvas.setPointerCapture(pointer);ui.orbit.checked=false;});
+  canvas.addEventListener("pointermove",event=>{
+    if(pointer!==event.pointerId) return;
+    yaw-=(event.clientX-lastX)*0.006; pitch=Math.max(-1.5,Math.min(1.5,pitch+(event.clientY-lastY)*0.006));
+    lastX=event.clientX;lastY=event.clientY;freeView();dirty=true;
+  });
+  for(const name of ["pointerup","pointercancel","lostpointercapture"]) canvas.addEventListener(name,()=>{pointer=null;});
+  canvas.addEventListener("wheel",event=>{event.preventDefault();zoom=Math.max(0.45,Math.min(3,zoom*Math.exp(-event.deltaY*0.001)));dirty=true;},{passive:false});
+  canvas.addEventListener("keydown",event=>{
+    if (!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","+","=","-","r","R"," "].includes(event.key)) return;
+    event.preventDefault();
+    if(event.key===" ") togglePlayback();
+    else if(event.key.toLowerCase()==="r") selectView("3d");
+    else if(["+","=","-"].includes(event.key)) zoom=Math.max(0.45,Math.min(3,zoom*(event.key==="-"?0.9:1.1)));
+    else { freeView();ui.orbit.checked=false;yaw+=(event.key==="ArrowLeft"?-0.08:event.key==="ArrowRight"?0.08:0);pitch=Math.max(-1.5,Math.min(1.5,pitch+(event.key==="ArrowUp"?-0.08:event.key==="ArrowDown"?0.08:0))); }
+    dirty=true;
+  });
+  function download(blob,name) {
+    if(!blob){ui.status.textContent="Export failed. Please try again.";return;}
+    const link=document.createElement("a"), url=URL.createObjectURL(blob);link.href=url;link.download=name;link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);ui.status.textContent=`Saved ${name}`;
+  }
+  document.getElementById("png").addEventListener("click",()=>{
+    render();
+    // Export a separate canvas so the viewer's current frame stays untouched.
+    const image=document.createElement("canvas");image.width=canvas.width;image.height=canvas.height;
+    const pen=image.getContext("2d");pen.drawImage(canvas,0,0);
+    const ratio=canvas.width/width;pen.scale(ratio,ratio);pen.fillStyle="#dbe8e9";pen.font="19px Georgia";pen.fillText(document.title,22,30);
+    pen.fillStyle="#8ca9b6";pen.font="10px sans-serif";pen.fillText(`${config.parameters}   ·   __METHOD__   ·   t = ${cursor.toFixed(2)}`,22,49);
+    image.toBlob(blob=>download(blob,`${config.slug}-${config.shape}.png`));
+  });
+  document.getElementById("csv").addEventListener("click",()=>download(new Blob(["t,x,y,z\n",points.map(p=>p.join(",")).join("\n")],{type:"text/csv;charset=utf-8"}),`${config.slug}-trajectory.csv`));
+  document.addEventListener("visibilitychange",()=>{previousFrame=null;});
+  new ResizeObserver(resize).observe(canvas);
+  resize();syncTime();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

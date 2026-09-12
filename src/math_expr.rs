@@ -50,6 +50,36 @@ pub struct MathExpr<'a, T: Float> {
 }
 
 impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
+    /// Returns all variable names, including those in conditional branches.
+    pub fn variables(&self) -> std::collections::HashSet<&'a str> {
+        let mut variables = std::collections::HashSet::new();
+        self.collect_variables(&mut variables);
+        variables
+    }
+
+    fn collect_variables(&self, variables: &mut std::collections::HashSet<&'a str>) {
+        if let Operation::Variable(name) = self.operation {
+            variables.insert(name);
+        }
+        for operand in &self.operands {
+            operand.collect_variables(variables);
+        }
+    }
+
+    /// Substitutes a variable structurally, without rewriting expression text.
+    pub fn substitute(&self, name: &str, replacement: &Self) -> Self {
+        if matches!(self.operation, Operation::Variable(variable) if variable == name) {
+            return replacement.clone();
+        }
+        Self::new(
+            self.operation.clone(),
+            self.operands
+                .iter()
+                .map(|operand| operand.substitute(name, replacement))
+                .collect(),
+        )
+    }
+
     fn new(operation: Operation<'a, T>, operands: Vec<MathExpr<'a, T>>) -> Self {
         Self {
             operation,
@@ -155,7 +185,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
         Self::new(Operation::SquareRoot, vec![operand])
     }
 
-    pub fn new_ln(operand: Self) -> Self {
+    pub fn new_log(operand: Self) -> Self {
         Self::new(Operation::NaturalLogarithm, vec![operand])
     }
 
@@ -222,7 +252,10 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     None => Self::new_multiply(
                         self.clone(),
                         Self::new_add(
-                            Self::new_multiply(exponent.derive(by_var), Self::new_ln(base.clone())),
+                            Self::new_multiply(
+                                exponent.derive(by_var),
+                                Self::new_log(base.clone()),
+                            ),
                             Self::new_multiply(
                                 exponent.clone(),
                                 Self::new_divide(base.derive(by_var), base.clone()),
@@ -338,6 +371,9 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
         }
     }
 
+    /// Applies real-algebra identities, not strict IEEE-754 equivalences.
+    /// Reassociation may change rounding, overflow, or signed zero; eliminating
+    /// expressions (including redundant iif checks) may remove evaluation errors.
     pub fn simplify(&self) -> Self {
         match &self.operation {
             Operation::Variable(name) => Self::new_var(name),
@@ -371,7 +407,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let operand = operand.simplify();
                 match operand.constant_value() {
                     Some(value) => Self::new_const(value.sin()),
-                    None => Self::new_sin(operand),
+                    None => Self::simplify_parity(Operation::Sine, operand, true),
                 }
             }
             Operation::Cosine => {
@@ -379,7 +415,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let operand = operand.simplify();
                 match operand.constant_value() {
                     Some(value) => Self::new_const(value.cos()),
-                    None => Self::new_cos(operand),
+                    None => Self::simplify_parity(Operation::Cosine, operand, false),
                 }
             }
             Operation::Tangent => {
@@ -387,7 +423,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let operand = operand.simplify();
                 match operand.constant_value() {
                     Some(value) => Self::new_const(value.tan()),
-                    None => Self::new_tan(operand),
+                    None => Self::simplify_parity(Operation::Tangent, operand, true),
                 }
             }
             Operation::ArcSine => {
@@ -395,7 +431,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let operand = operand.simplify();
                 match operand.constant_value() {
                     Some(value) => Self::new_const(value.asin()),
-                    None => Self::new_asin(operand),
+                    None => Self::simplify_parity(Operation::ArcSine, operand, true),
                 }
             }
             Operation::ArcCosine => {
@@ -411,7 +447,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let operand = operand.simplify();
                 match operand.constant_value() {
                     Some(value) => Self::new_const(value.atan()),
-                    None => Self::new_atan(operand),
+                    None => Self::simplify_parity(Operation::ArcTangent, operand, true),
                 }
             }
             Operation::HyperbolicSine => {
@@ -419,7 +455,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let operand = operand.simplify();
                 match operand.constant_value() {
                     Some(value) => Self::new_const(value.sinh()),
-                    None => Self::new_sinh(operand),
+                    None => Self::simplify_parity(Operation::HyperbolicSine, operand, true),
                 }
             }
             Operation::HyperbolicCosine => {
@@ -427,7 +463,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let operand = operand.simplify();
                 match operand.constant_value() {
                     Some(value) => Self::new_const(value.cosh()),
-                    None => Self::new_cosh(operand),
+                    None => Self::simplify_parity(Operation::HyperbolicCosine, operand, false),
                 }
             }
             Operation::HyperbolicTangent => {
@@ -435,7 +471,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let operand = operand.simplify();
                 match operand.constant_value() {
                     Some(value) => Self::new_const(value.tanh()),
-                    None => Self::new_tanh(operand),
+                    None => Self::simplify_parity(Operation::HyperbolicTangent, operand, true),
                 }
             }
             Operation::Sign => {
@@ -451,7 +487,11 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 let operand = operand.simplify();
                 match operand.constant_value() {
                     Some(value) => Self::new_const(value.abs()),
-                    None => Self::new_abs(operand),
+                    None => match (&operand.operation, operand.operands.as_slice()) {
+                        (Operation::AbsoluteValue, [_]) => operand,
+                        (Operation::Negate, [inner]) => Self::new_abs(inner.clone()).simplify(),
+                        _ => Self::new_abs(operand),
+                    },
                 }
             }
             Operation::Exponent => {
@@ -472,11 +512,19 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
             }
             Operation::NaturalLogarithm => {
                 let (operand,) = self.unary_operands(Operation::NaturalLogarithm).unwrap();
-                Self::simplify_natural_logarithm(operand.simplify())
+                let operand = operand.simplify();
+                match operand.constant_value() {
+                    Some(value) => Self::new_const(value.ln()),
+                    None => Self::new_log(operand),
+                }
             }
             Operation::CommonLogarithm => {
                 let (operand,) = self.unary_operands(Operation::CommonLogarithm).unwrap();
-                Self::simplify_common_logarithm(operand.simplify())
+                let operand = operand.simplify();
+                match operand.constant_value() {
+                    Some(value) => Self::new_const(value.log10()),
+                    None => Self::new_log10(operand),
+                }
             }
             Operation::ImmediateIf => {
                 let (check, if_less_than_zero, otherwise) =
@@ -487,7 +535,13 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                     Some(value) if value < T::zero() => if_less_than_zero.simplify(),
                     Some(_) => otherwise.simplify(),
                     None => {
-                        Self::new_iif(check, if_less_than_zero.simplify(), otherwise.simplify())
+                        let left = if_less_than_zero.simplify();
+                        let right = otherwise.simplify();
+                        if Self::equivalent_terms(&left, &right) {
+                            left
+                        } else {
+                            Self::new_iif(check, left, right)
+                        }
                     }
                 }
             }
@@ -536,13 +590,17 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
                 Self::collect_addends(left, sign, terms, constant);
                 Self::collect_addends(right, -sign, terms, constant);
             }
+            (Operation::Negate, [inner]) => {
+                Self::collect_addends(inner, -sign, terms, constant);
+            }
             (Operation::Constant(value), []) => *constant = *constant + sign * *value,
             _ => {
                 let (coefficient, term) = expression.coefficient_and_term();
                 let coefficient = sign * coefficient;
 
-                if let Some((existing_coefficient, _)) =
-                    terms.iter_mut().find(|(_, existing)| existing == &term)
+                if let Some((existing_coefficient, _)) = terms
+                    .iter_mut()
+                    .find(|(_, existing)| Self::equivalent_terms(existing, &term))
                 {
                     *existing_coefficient = *existing_coefficient + coefficient;
                 } else {
@@ -564,7 +622,9 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
     }
 
     fn scale_term(coefficient: T, term: Self) -> Self {
-        if coefficient == T::one() {
+        if coefficient == T::zero() {
+            Self::new_const(T::zero())
+        } else if coefficient == T::one() {
             term
         } else if coefficient == -T::one() {
             Self::new_negate(term)
@@ -574,24 +634,113 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
     }
 
     fn simplify_product(left: Self, right: Self) -> Self {
-        match (left.constant_value(), right.constant_value()) {
-            (Some(left), Some(right)) => Self::new_const(left * right),
-            (Some(value), _) if value == T::zero() => Self::new_const(T::zero()),
-            (_, Some(value)) if value == T::zero() => Self::new_const(T::zero()),
-            (Some(value), _) if value == T::one() => right,
-            (_, Some(value)) if value == T::one() => left,
-            (Some(value), _) if value == -T::one() => Self::simplify_negation(right),
-            (_, Some(value)) if value == -T::one() => Self::simplify_negation(left),
-            (Some(value), _) => {
-                let (nested_coefficient, term) = right.coefficient_and_term();
-                if nested_coefficient == T::one() {
-                    Self::new_multiply(Self::new_const(value), right)
-                } else {
-                    Self::scale_term(value * nested_coefficient, term)
+        let mut coefficient = T::one();
+        let mut factors = Vec::new();
+        Self::collect_factors(left, &mut coefficient, &mut factors);
+        Self::collect_factors(right, &mut coefficient, &mut factors);
+        if factors.is_empty() || coefficient == T::zero() {
+            return Self::new_const(coefficient);
+        }
+
+        let mut powers: Vec<(Self, T)> = Vec::new();
+        for factor in factors {
+            let (base, exponent) = match (&factor.operation, factor.operands.as_slice()) {
+                (Operation::Power, [base, exponent]) => match exponent.constant_value() {
+                    Some(n) if n.is_finite() && n > T::zero() && n.fract() == T::zero() => {
+                        (base.clone(), n)
+                    }
+                    // Do not merge fractional, negative, or symbolic powers.
+                    _ => {
+                        powers.push((factor, T::one()));
+                        continue;
+                    }
+                },
+                _ => (factor, T::one()),
+            };
+            if let Some((_, existing)) = powers.iter_mut().find(|(term, n)| {
+                Self::equivalent_terms(term, &base) && (*n + exponent).is_finite()
+            }) {
+                *existing = *existing + exponent;
+            } else {
+                powers.push((base, exponent));
+            }
+        }
+        let term = powers
+            .into_iter()
+            .map(|(base, exponent)| Self::simplify_power(base, Self::new_const(exponent)))
+            .reduce(Self::new_multiply)
+            .unwrap();
+        Self::scale_term(coefficient, term)
+    }
+
+    fn collect_factors(expression: Self, coefficient: &mut T, factors: &mut Vec<Self>) {
+        match expression.operation {
+            Operation::Constant(value) => *coefficient = *coefficient * value,
+            Operation::Negate => {
+                *coefficient = -*coefficient;
+                Self::collect_factors(
+                    expression.operands.into_iter().next().unwrap(),
+                    coefficient,
+                    factors,
+                );
+            }
+            Operation::Multiply => {
+                for operand in expression.operands {
+                    Self::collect_factors(operand, coefficient, factors);
                 }
             }
-            (_, Some(value)) => Self::simplify_product(Self::new_const(value), left),
-            _ => Self::new_multiply(left, right),
+            _ => factors.push(expression),
+        }
+    }
+
+    // Compare products as multisets without imposing an arbitrary printed order.
+    fn equivalent_terms(left: &Self, right: &Self) -> bool {
+        if left == right {
+            return true;
+        }
+        if left.operation != Operation::Multiply || right.operation != Operation::Multiply {
+            return false;
+        }
+        fn flatten<'e, 'a, T: Float>(
+            expression: &'e MathExpr<'a, T>,
+            factors: &mut Vec<&'e MathExpr<'a, T>>,
+        ) {
+            if expression.operation == Operation::Multiply {
+                for operand in &expression.operands {
+                    flatten(operand, factors);
+                }
+            } else {
+                factors.push(expression);
+            }
+        }
+        let (mut lhs, mut rhs) = (Vec::new(), Vec::new());
+        flatten(left, &mut lhs);
+        flatten(right, &mut rhs);
+        if lhs.len() != rhs.len() {
+            return false;
+        }
+        for factor in lhs {
+            if let Some(index) = rhs.iter().position(|other| factor == *other) {
+                rhs.swap_remove(index);
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn simplify_parity(operation: Operation<'a, T>, operand: Self, odd: bool) -> Self {
+        let (coefficient, term) = operand.coefficient_and_term();
+        if coefficient < T::zero() {
+            let positive = Self::scale_term(-coefficient, term);
+            let function = Self::new(operation, vec![positive]);
+            if odd {
+                Self::new_negate(function)
+            } else {
+                function
+            }
+        } else {
+            Self::new(operation, vec![operand])
         }
     }
 
@@ -602,11 +751,23 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
             _ if numerator == denominator => Self::new_const(T::one()),
             (_, Some(value)) if value == T::one() => numerator,
             (_, Some(value)) if value == -T::one() => Self::simplify_negation(numerator),
+            (_, Some(value)) if value.is_finite() && value != T::zero() => {
+                let (coefficient, term) = numerator.coefficient_and_term();
+                let scaled = coefficient / value;
+                if scaled.is_finite() && (scaled != T::zero() || coefficient == T::zero()) {
+                    Self::scale_term(scaled, term)
+                } else {
+                    Self::new_divide(numerator, denominator)
+                }
+            }
             _ => Self::new_divide(numerator, denominator),
         }
     }
 
     fn simplify_power(base: Self, exponent: Self) -> Self {
+        if base.constant_value() == Some(T::one()) {
+            return Self::new_const(T::one());
+        }
         if let Some(exponent_value) = exponent.constant_value() {
             if exponent_value == T::zero() {
                 return Self::new_const(T::one());
@@ -617,8 +778,13 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
 
             if let (Operation::Power, [inner_base, inner_exponent]) =
                 (&base.operation, base.operands.as_slice())
+                && let Some(inner_exponent) = inner_exponent.constant_value()
             {
-                if let Some(inner_exponent) = inner_exponent.constant_value() {
+                let exponents_are_integers = inner_exponent.is_finite()
+                    && inner_exponent.fract() == T::zero()
+                    && exponent_value.is_finite()
+                    && exponent_value.fract() == T::zero();
+                if exponents_are_integers {
                     return Self::simplify_power(
                         inner_base.clone(),
                         Self::new_const(inner_exponent * exponent_value),
@@ -634,30 +800,6 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
         Self::new_power(base, exponent)
     }
 
-    fn simplify_natural_logarithm(operand: Self) -> Self {
-        match (&operand.operation, operand.operands.as_slice()) {
-            (Operation::Power, [base, exponent]) => {
-                Self::simplify_product(exponent.clone(), Self::new_ln(base.clone()))
-            }
-            _ => match operand.constant_value() {
-                Some(value) => Self::new_const(value.ln()),
-                None => Self::new_ln(operand),
-            },
-        }
-    }
-
-    fn simplify_common_logarithm(operand: Self) -> Self {
-        match (&operand.operation, operand.operands.as_slice()) {
-            (Operation::Power, [base, exponent]) => {
-                Self::simplify_product(exponent.clone(), Self::new_log10(base.clone()))
-            }
-            _ => match operand.constant_value() {
-                Some(value) => Self::new_const(value.log10()),
-                None => Self::new_log10(operand),
-            },
-        }
-    }
-
     fn simplify_negation(operand: Self) -> Self {
         if let Some(value) = operand.constant_value() {
             return Self::new_const(-value);
@@ -665,6 +807,7 @@ impl<'a, T: Float + std::fmt::Debug> MathExpr<'a, T> {
 
         match (&operand.operation, operand.operands.as_slice()) {
             (Operation::Negate, [inner]) => inner.clone(),
+            (Operation::Multiply, _) => Self::simplify_product(Self::new_const(-T::one()), operand),
             _ => Self::new_negate(operand),
         }
     }
@@ -858,7 +1001,7 @@ impl<T: Float> Display for Operation<'_, T> {
             Operation::AbsoluteValue => write!(formatter, "abs"),
             Operation::Exponent => write!(formatter, "exp"),
             Operation::SquareRoot => write!(formatter, "sqrt"),
-            Operation::NaturalLogarithm => write!(formatter, "ln"),
+            Operation::NaturalLogarithm => write!(formatter, "log"),
             Operation::CommonLogarithm => write!(formatter, "log10"),
             Operation::ImmediateIf => write!(formatter, "iif"),
         }
@@ -893,7 +1036,7 @@ impl<T: Float + Display> Display for MathExpr<'_, T> {
             (Operation::AbsoluteValue, [operand]) => write!(formatter, "abs({operand})"),
             (Operation::Exponent, [operand]) => write!(formatter, "exp({operand})"),
             (Operation::SquareRoot, [operand]) => write!(formatter, "sqrt({operand})"),
-            (Operation::NaturalLogarithm, [operand]) => write!(formatter, "ln({operand})"),
+            (Operation::NaturalLogarithm, [operand]) => write!(formatter, "log({operand})"),
             (Operation::CommonLogarithm, [operand]) => write!(formatter, "log10({operand})"),
             (Operation::ImmediateIf, [check, if_less_than_zero, otherwise]) => {
                 write!(formatter, "iif({check}, {if_less_than_zero}, {otherwise})")

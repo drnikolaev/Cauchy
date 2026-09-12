@@ -86,7 +86,7 @@ impl Default for Solver {
             max_step: 0.1,
             tolerance: 1e-9,
             relative_threshold: 1.0,
-            max_steps: 100_000,
+            max_steps: 10_000_000,
         }
     }
 }

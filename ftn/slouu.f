@@ -51,9 +51,11 @@ CDEC$ ENDIF
       I5    = I4 + MM
 
 30    C1 = H / 4.D0
-      CALL DCOPY (MM, B, ONE, R(I5), ONE)
-      CALL DSCAL (MM, C1, R(I5), ONE)
-      CALL MEXP (M, R(I5), R, EPS, IERR)
+C     I2 has M*M slots and is not needed until the full-step result.
+C     I5 has only 6*M slots, too few for a matrix when M is above 6.
+      CALL DCOPY (MM, B, ONE, R(I2), ONE)
+      CALL DSCAL (MM, C1, R(I2), ONE)
+      CALL MEXP (M, R(I2), R, EPS, IERR)
       IF (IERR .NE. 0) RETURN
       IF (.NOT. BULEX) THEN
          CALL DGEMM('N','N', M, M, M, ONER, R, M, R, M, ZERO, R(I1), M)

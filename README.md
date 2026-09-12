@@ -17,11 +17,77 @@ so Cargo exposes the library as `cauchy_ode`: imports use `use cauchy_ode::...`.
 
 *Aizawa attractor computed by cauchy-ode*
 
-## Library usage
-
 `Solver` integrates expressions with the adaptive England, Lawson, and
-Rosenbrock methods. Build with Cargo and a Fortran compiler (`gfortran` by default,
-or set `FC`). Linking uses Accelerate on macOS and BLAS/LAPACK/MKL elsewhere.
+Rosenbrock methods. Build with Cargo and a Fortran compiler: Intel `ifx` on
+Windows, or `gfortran` on Linux/macOS. Linking uses Intel oneMKL on Windows,
+Accelerate on macOS, and BLAS/LAPACK on Linux. See [Building](#building).
+
+## Building
+
+### Windows (Intel Fortran)
+
+Install the following x64 tools:
+
+- Current stable Rust with the `x86_64-pc-windows-msvc` toolchain.
+- Visual Studio 2022 or Build Tools with **Desktop development with C++**,
+  including the MSVC x64 tools and a Windows SDK.
+- Intel oneAPI **Fortran Compiler** (`ifx`) and **oneMKL** development libraries.
+
+From PowerShell, Command Prompt, or an IDE terminal in the repository, use Cargo
+directly:
+
+```powershell
+cargo build --release
+cargo test
+cargo run --release --example lorenz
+```
+
+The build script runs Intel's `setvars.bat` in a child process to find `ifx`,
+the MSVC librarian, and the Intel runtime and oneMKL libraries. It passes the
+detected library directories to Rust's linker, so `LIB` and `MKLROOT` need not
+already be set in your terminal. This does not change your shell environment.
+It uses `%ProgramFiles(x86)%\Intel\oneAPI` by default. Set `ONEAPI_ROOT` to the
+oneAPI installation directory if installed elsewhere; an explicit `MKLROOT`
+selects a different oneMKL installation.
+
+The Intel compiler and oneMKL **runtime DLL directories** must still be on
+`PATH` to run the built executables (normally `compiler\latest\bin` and
+`mkl\latest\bin` under the oneAPI installation). If they are not on `PATH`,
+the helper sets up the environment for both building and running:
+
+```powershell
+.\scripts\cargo-intel.cmd run --release --example lorenz
+.\scripts\cargo-intel.cmd test
+```
+
+Alternatively, open an **Intel oneAPI command prompt for Intel 64** and run
+Cargo directly. To initialize an ordinary **Command Prompt** manually:
+
+```bat
+call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64
+cargo build --release
+cargo test
+```
+
+Windows builds default to `FC=ifx` and `AR=lib.exe`. `FC` may also name Intel
+`ifort` or the full path to an Intel compiler; `AR` must use the MSVC librarian
+command syntax. These variables name executables, without extra flags.
+The supported Windows target is `x86_64-pc-windows-msvc`.
+
+The build links the sequential LP64 oneMKL libraries, matching the Fortran
+32-bit integer ABI and allowing concurrent Rust solves without MKL thread
+pools. When distributing an executable, include the corresponding Intel
+Fortran and oneMKL redistributable runtimes.
+
+### Linux and macOS (GNU Fortran)
+
+Install `gfortran` and, on Linux, BLAS/LAPACK development libraries (for example,
+`sudo apt install gfortran libblas-dev liblapack-dev` on Debian/Ubuntu).
+On macOS, install GCC with `brew install gcc`; Accelerate is supplied by macOS.
+Then run `cargo build --release` and `cargo test`. Set `FC` if the GNU Fortran
+executable has a versioned name or a custom path, and `AR` to override `ar`.
+
+## Library usage
 
 ```rust
 use cauchy_ode::Solver;
@@ -285,7 +351,7 @@ This is a pair of coupled first-order ODEs with a two-dimensional state.
 solver is England; the output contains the initial point and every accepted
 adaptive step, including the endpoint, as `t,x,y` rows. No plotting code or
 additional dependencies are needed. Building requires a Fortran compiler as
-described under [Library usage](#library-usage).
+described under [Building](#building).
 
 ## Lorenz butterfly demo
 
@@ -375,7 +441,7 @@ cargo run --release --example aizawa -- --method rosenbrock-autonomous --duratio
 cargo run --release --example aizawa -- --no-open --output target/aizawa.html
 ```
 
-## Stiff-system regression tests
+## Stiff system regression tests
 
 ```bash
 cargo test --test stiff_systems -- --nocapture

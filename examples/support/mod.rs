@@ -49,7 +49,7 @@ pub fn run(demo: Demo) -> Result<(), Box<dyn Error>> {
                     "{} {} — computed by cauchy-ode\n\n\
                     cargo run --release --example {} -- [OPTIONS]\n\n\
                     --method england|lawson|rosenbrock|rosenbrock-autonomous\n\
-                    --duration SECONDS    Integration interval (default: {}, maximum: 500)\n\
+                    --duration SECONDS    Integration interval (default: {}, maximum: 5000000)\n\
                     --output PATH         HTML output (default: target/{}.html)\n\
                     --no-open             Generate the viewer without launching a browser",
                     demo.system_name, demo.shape, demo.slug, demo.duration, demo.slug
@@ -59,8 +59,8 @@ pub fn run(demo: Demo) -> Result<(), Box<dyn Error>> {
             _ => return Err(format!("unknown option: {arg}; use --help").into()),
         }
     }
-    if !duration.is_finite() || duration <= 0.0 || duration > 500.0 {
-        return Err("duration must be finite, positive, and at most 500".into());
+    if !duration.is_finite() || duration <= 0.0 || duration > 5000000.0 {
+        return Err("duration must be finite, positive, and at most 5000000".into());
     }
 
     let system = OdeSystem::autonomous(&["x", "y", "z"], &demo.equations)?;
@@ -69,7 +69,7 @@ pub fn run(demo: Demo) -> Result<(), Box<dyn Error>> {
         initial_step: 0.005,
         max_step: 0.02,
         tolerance: 1e-9,
-        max_steps: 500_000,
+        max_steps: 10_000_000,
         ..Solver::default()
     };
     println!(

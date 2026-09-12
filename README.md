@@ -13,6 +13,8 @@ for the mathematical formulation.
 The Cargo package is named `cauchy-ode`. Rust identifiers cannot contain dashes,
 so Cargo exposes the library as `cauchy_ode`: imports use `use cauchy_ode::...`.
 
+![Aizawa attractor trajectory](Aizawa.png)
+
 ## Library usage
 
 `Solver` integrates expressions with the adaptive England, Lawson, and

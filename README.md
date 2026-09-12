@@ -15,6 +15,8 @@ so Cargo exposes the library as `cauchy_ode`: imports use `use cauchy_ode::...`.
 
 ![Aizawa attractor trajectory](Aizawa.png)
 
+*Aizawa attractor computed by cauchy-ode*
+
 ## Library usage
 
 `Solver` integrates expressions with the adaptive England, Lawson, and
@@ -24,11 +26,14 @@ or set `FC`). Linking uses Accelerate on macOS and BLAS/LAPACK/MKL elsewhere.
 ```rust
 use cauchy_ode::Solver;
 
-// x' = t + sqrt(x), x(1) = 1, integrate to t = 2.
-let solution = Solver::default()
-    .solve("t+sqrt(x)", 1.0, 1.0, 2.0)
-    .expect("ODE integration failed");
-let final_x = solution.states.last().unwrap()[0]; // approximately 4
+fn main() {
+    // x' = t + sqrt(x), x(1) = 1, integrate to t = 2.
+    let solution = Solver::default()
+        .solve("t+sqrt(x)", 1.0, 1.0, 2.0)
+        .expect("ODE integration failed");
+    let final_x = solution.states.last().unwrap()[0]; // approximately 4
+    println!("x(2) = {final_x}");
+}
 ```
 
 `solve(rhs, start_time, initial_x, end_time)` accepts `t` and `x` in the RHS.
@@ -37,10 +42,13 @@ For systems, use one expression per component and zero-based variable names:
 ```rust
 use cauchy_ode::Solver;
 
-// x0' = x1, x1' = -x0.
-let solution = Solver::default().solve_system(
-    &["x1", "-x0"], 0.0, &[1.0, 0.0], std::f64::consts::TAU,
-).expect("ODE integration failed");
+fn main() {
+    // x0' = x1, x1' = -x0.
+    let solution = Solver::default().solve_system(
+        &["x1", "-x0"], 0.0, &[1.0, 0.0], std::f64::consts::TAU,
+    ).expect("ODE integration failed");
+    println!("Final state: {:?}", solution.states.last().unwrap());
+}
 ```
 
 
@@ -79,11 +87,14 @@ For custom variable names and reusable parsed systems:
 ```rust
 use cauchy_ode::{Method, OdeSystem, Solver};
 
-let system = OdeSystem::new("time", &["position", "velocity"], &[
-    "velocity", "-position - 0.1*velocity + sin(time)",
-]).unwrap();
-let solver = Solver { method: Method::Rosenbrock, ..Solver::default() };
-let solution = solver.solve_problem(&system, 0.0, &[1.0, 0.0], 10.0).unwrap();
+fn main() {
+    let system = OdeSystem::new("time", &["position", "velocity"], &[
+        "velocity", "-position - 0.1*velocity + sin(time)",
+    ]).unwrap();
+    let solver = Solver { method: Method::Rosenbrock, ..Solver::default() };
+    let solution = solver.solve_problem(&system, 0.0, &[1.0, 0.0], 10.0).unwrap();
+    println!("Final state: {:?}", solution.states.last().unwrap());
+}
 ```
 
 `OdeSystem::autonomous(&["x", "y"], &["y", "-x"])` declares a time-independent
@@ -106,15 +117,18 @@ and symbolic differentiation:
 ```rust
 use cauchy_ode::{OdeSystem, Solver};
 
-let system = OdeSystem::new_with_parameters(
-    "clock",
-    &["position", "velocity"],
-    &["velocity", "-stiffness*position-damping*velocity+sin(clock)"],
-    &[("stiffness", 4.0), ("damping", 0.2)],
-).unwrap();
-let trajectory = Solver::default()
-    .solve_problem(&system, 0.0, &[1.0, 0.0], 10.0)
-    .unwrap();
+fn main() {
+    let system = OdeSystem::new_with_parameters(
+        "clock",
+        &["position", "velocity"],
+        &["velocity", "-stiffness*position-damping*velocity+sin(clock)"],
+        &[("stiffness", 4.0), ("damping", 0.2)],
+    ).unwrap();
+    let trajectory = Solver::default()
+        .solve_problem(&system, 0.0, &[1.0, 0.0], 10.0)
+        .unwrap();
+    println!("Final state: {:?}", trajectory.states.last().unwrap());
+}
 ```
 
 Bindings are `&[(&str, f64)]`. Values must be finite; parameter names must be valid
@@ -131,10 +145,12 @@ forcing. The parameterized split constructor takes **matrix expression strings**
 instead of the numeric matrix accepted by `split`:
 
 ```rust
-let system = cauchy_ode::OdeSystem::split_with_parameters(
-    "clock", &["amount"], &["-rate"], &["-loss*amount^2"],
-    &[("rate", 2.0), ("loss", 1.0)],
-).unwrap();
+fn main() {
+    let _system = cauchy_ode::OdeSystem::split_with_parameters(
+        "clock", &["amount"], &["-rate"], &["-loss*amount^2"],
+        &[("rate", 2.0), ("loss", 1.0)],
+    ).unwrap();
+}
 ```
 
 After substitution, its matrix must evaluate to finite constants; the remainder
@@ -146,11 +162,14 @@ For `x' = A(t)x + phi(t)`, supply matrix entries and forcing as expressions:
 ```rust
 use cauchy_ode::{Method, OdeSystem, Solver};
 
-// Column-major A(t) = [[-2, t], [0, -3]].
-let system = OdeSystem::linear("t", &["x", "y"],
-    &["-2", "0", "t", "-3"], &["sin(t)", "0"]).unwrap();
-let solver = Solver { method: Method::LawsonLinear, ..Solver::default() };
-let solution = solver.solve_problem(&system, 0.0, &[1.0, 0.0], 2.0).unwrap();
+fn main() {
+    // Column-major A(t) = [[-2, t], [0, -3]].
+    let system = OdeSystem::linear("t", &["x", "y"],
+        &["-2", "0", "t", "-3"], &["sin(t)", "0"]).unwrap();
+    let solver = Solver { method: Method::LawsonLinear, ..Solver::default() };
+    let solution = solver.solve_problem(&system, 0.0, &[1.0, 0.0], 2.0).unwrap();
+    println!("Final state: {:?}", solution.states.last().unwrap());
+}
 ```
 
 For `x' = Bx + u(t,x)`, supply constant matrix entries and remainder expressions:
@@ -158,10 +177,13 @@ For `x' = Bx + u(t,x)`, supply constant matrix entries and remainder expressions
 ```rust
 use cauchy_ode::{Method, OdeSystem, Solver};
 
-let system = OdeSystem::split("t", &["x", "y"],
-    &[-100.0, 0.0, 2.0, -3.0], &["sin(t)-x^3", "x*y"]).unwrap();
-let solver = Solver { method: Method::LawsonSplit, ..Solver::default() };
-let solution = solver.solve_problem(&system, 0.0, &[1.0, 0.0], 2.0).unwrap();
+fn main() {
+    let system = OdeSystem::split("t", &["x", "y"],
+        &[-100.0, 0.0, 2.0, -3.0], &["sin(t)-x^3", "x*y"]).unwrap();
+    let solver = Solver { method: Method::LawsonSplit, ..Solver::default() };
+    let solution = solver.solve_problem(&system, 0.0, &[1.0, 0.0], 2.0).unwrap();
+    println!("Final state: {:?}", solution.states.last().unwrap());
+}
 ```
 
 All matrices, including Jacobian callbacks, use Fortran column-major order:

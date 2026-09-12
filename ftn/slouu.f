@@ -34,7 +34,7 @@ CDEC$ ENDIF
       INTEGER   ONE /1/, MM, I1, I2, I3, I4, I5, IDAMAX
       LOGICAL   BULD, BULHM, BULEX
       DOUBLE PRECISION EPS1, THETA, AMPL, C1, ONER /1.0D0/, 
-     1          ZERO /0.0D0/, CDS /32.0D0/, 
+     1          ZERO /0.0D0/, CDS /31.0D0/, 
      2          CRUNGE /0.0666666666666666666667D0/
 
       IERR  = 0

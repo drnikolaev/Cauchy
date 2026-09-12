@@ -29,7 +29,7 @@ fn link_fortran_runtime(compiler: &OsStr, target_os: &str) {
     );
     let directory = path
         .parent()
-        .filter(|_| path != PathBuf::from(library))
+        .filter(|_| path != std::path::Path::new(library))
         .unwrap_or_else(|| panic!("Fortran compiler could not locate {library}"));
 
     println!("cargo:rustc-link-search=native={}", directory.display());
@@ -38,57 +38,50 @@ fn link_fortran_runtime(compiler: &OsStr, target_os: &str) {
 
 fn main() {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR must be set by Cargo"));
-    let evaluate_math_expr_object = out_dir.join("evaluate_math_expr.o");
-    let matrix_exp_object = out_dir.join("matrix_exp.o");
-    let matrix_inverse_object = out_dir.join("matrix_inverse.o");
-    let sengl_object = out_dir.join("sengl.o");
-    let library = out_dir.join("libcauchy_fortran.a");
+    let library = out_dir.join("libcauchy_ode_fortran.a");
     let fortran_compiler = env::var_os("FC").unwrap_or_else(|| "gfortran".into());
     let archiver = env::var_os("AR").unwrap_or_else(|| "ar".into());
 
-    run(
-        Command::new(&fortran_compiler)
-            .args(["-c", "-O2", "-fPIC", "ftn/evaluate_math_expr.f", "-o"])
-            .arg(&evaluate_math_expr_object),
-        "compile ftn/evaluate_math_expr.f",
-    );
-    run(
-        Command::new(&fortran_compiler)
-            .args(["-c", "-O2", "-fPIC", "ftn/matrix_exp.f", "-o"])
-            .arg(&matrix_exp_object),
-        "compile ftn/matrix_exp.f",
-    );
-    run(
-        Command::new(&fortran_compiler)
-            .args(["-c", "-O2", "-fPIC", "ftn/matrix_inverse.f", "-o"])
-            .arg(&matrix_inverse_object),
-        "compile ftn/matrix_inverse.f",
-    );
-    run(
-        Command::new(&fortran_compiler)
-            .args(["-c", "-O2", "-fPIC", "-frecursive", "ftn/sengl.f", "-o"])
-            .arg(&sengl_object),
-        "compile ftn/sengl.f",
-    );
-    run(
-        Command::new(archiver)
-            .args(["crs"])
-            .arg(&library)
-            .arg(&evaluate_math_expr_object)
-            .arg(&matrix_exp_object)
-            .arg(&matrix_inverse_object)
-            .arg(&sengl_object),
-        "archive the Fortran objects",
-    );
-
-    println!("cargo:rerun-if-changed=ftn/evaluate_math_expr.f");
-    println!("cargo:rerun-if-changed=ftn/matrix_exp.f");
-    println!("cargo:rerun-if-changed=ftn/matrix_inverse.f");
-    println!("cargo:rerun-if-changed=ftn/sengl.f");
+    // Compile the callback module before its users. Keep generated .mod files
+    // in OUT_DIR, and make local work arrays private to concurrent solves.
+    let sources = [
+        "solver_callbacks.f90",
+        "solver_linalg.f90",
+        "evaluate_math_expr.f",
+        "matrix_exp.f",
+        "matrix_inverse.f",
+        "mpp.f",
+        "sengl.f",
+        "sloun.f",
+        "sloui.f",
+        "slouu.f",
+        "srosn.f",
+        "srosa.f",
+    ];
+    let mut archive = Command::new(archiver);
+    archive.arg("crs").arg(&library);
+    for source in sources {
+        let path = PathBuf::from("ftn").join(source);
+        let object = out_dir.join(source).with_extension("o");
+        run(
+            Command::new(&fortran_compiler)
+                .args(["-c", "-O2", "-fPIC", "-frecursive", "-J"])
+                .arg(&out_dir)
+                .arg("-I")
+                .arg(&out_dir)
+                .arg(&path)
+                .arg("-o")
+                .arg(&object),
+            &format!("compile {}", path.display()),
+        );
+        archive.arg(object);
+        println!("cargo:rerun-if-changed={}", path.display());
+    }
+    run(&mut archive, "archive the Fortran objects");
     println!("cargo:rerun-if-env-changed=FC");
     println!("cargo:rerun-if-env-changed=AR");
     println!("cargo:rustc-link-search=native={}", out_dir.display());
-    println!("cargo:rustc-link-lib=static=cauchy_fortran");
+    println!("cargo:rustc-link-lib=static=cauchy_ode_fortran");
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("target OS must be set");
     link_fortran_runtime(&fortran_compiler, &target_os);

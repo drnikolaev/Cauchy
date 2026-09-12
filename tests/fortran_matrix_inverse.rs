@@ -1,4 +1,4 @@
-use cauchy::fortran::matrix_inverse;
+use cauchy_ode::fortran::matrix_inverse;
 
 #[test]
 fn call_fortran_matrix_inverse_from_rust() {

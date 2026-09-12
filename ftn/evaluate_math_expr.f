@@ -1,6 +1,6 @@
-      SUBROUTINE CAUCHY_FORTRAN_EVALUATE(SOURCE, SOURCE_LEN,
+      SUBROUTINE CAUCHY_ODE_FORTRAN_EVALUATE(SOURCE, SOURCE_LEN,
      &     X, X_LEN, ANSWER, INFO) BIND(C,
-     &     NAME="cauchy_fortran_evaluate_math_expr")
+     &     NAME="cauchy_ode_fortran_evaluate_math_expr")
       USE, INTRINSIC :: ISO_C_BINDING, ONLY: C_CHAR, C_INT,
      &     C_DOUBLE
       IMPLICIT NONE
@@ -15,7 +15,7 @@
       INTERFACE
          FUNCTION RUST_EVALUATE(SOURCE, SOURCE_LEN, X, X_LEN,
      &        ANSWER) RESULT(STATUS) BIND(C,
-     &        NAME="cauchy_evaluate_math_expr")
+     &        NAME="cauchy_ode_evaluate_math_expr")
          USE, INTRINSIC :: ISO_C_BINDING, ONLY: C_CHAR, C_INT,
      &        C_DOUBLE
 
@@ -30,4 +30,4 @@
 
       INFO = RUST_EVALUATE(SOURCE, SOURCE_LEN, X, X_LEN,
      &   ANSWER)
-      END SUBROUTINE CAUCHY_FORTRAN_EVALUATE
+      END SUBROUTINE CAUCHY_ODE_FORTRAN_EVALUATE

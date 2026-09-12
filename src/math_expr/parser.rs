@@ -203,7 +203,7 @@ where
                 "abs" => Ok(MathExpr::new_abs(operand)),
                 "exp" => Ok(MathExpr::new_exp(operand)),
                 "sqrt" => Ok(MathExpr::new_sqrt(operand)),
-                "ln" => Ok(MathExpr::new_ln(operand)),
+                "log" => Ok(MathExpr::new_log(operand)),
                 "log10" => Ok(MathExpr::new_log10(operand)),
                 _ => Err(ParseError {
                     position: start,

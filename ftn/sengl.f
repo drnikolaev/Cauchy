@@ -5,8 +5,8 @@ C Distributed under the Boost Software License, Version 1.0.
 C    (See accompanying file LICENSE_1_0.txt or copy at
 C          http://www.boost.org/LICENSE_1_0.txt)
 
-C     F    - BIND(C) callback F(M,T,X,Z,CONTEXT,IERR) computes Z(T,X)
-C     CONTEXT - opaque caller-owned C pointer, passed by value
+C     F    - BIND(C) callback F(PC,M,T,X,Z,IERR) computes Z(T,X)
+C     PC   - opaque caller-owned C pointer, passed by reference
 C     Callback sets IERR to zero on success, negative on failure.
 C     M    - [input] arrays' length, INTEGER
 C     HMIN - [input] minimum step magnitude allowed, DOUBLE PRECISION
@@ -20,32 +20,23 @@ C            (actual step taken can be different)
 C     R    - [input,output] working array of 7*M DOUBLE elements
 C     IERR - [output] error code, zero for success, non-zero otherwise, INTEGER
 
-      SUBROUTINE SENGL (F, CONTEXT, M, HMIN, HMAX, EPS, P,
-     &                  X, T, H, R, IERR) BIND(C, NAME="cauchy_sengl")
-      USE, INTRINSIC :: ISO_C_BINDING, ONLY: C_INT, C_DOUBLE, C_PTR
+      SUBROUTINE SENGL (PC, F, M, HMIN, HMAX, EPS, P,
+     &                  X, T, H, R, IERR)
+     & BIND(C, NAME="cauchy_ode_sengl")
+      USE CAUCHY_ODE_CALLBACKS
       IMPLICIT NONE
 CDEC$ IF DEFINED (FTN_EXPORTS)
 CDEC$ ATTRIBUTES DLLEXPORT :: SENGL
 CDEC$ ENDIF
-      TYPE(C_PTR), VALUE :: CONTEXT
+      TYPE(C_PTR) PC
       INTEGER(C_INT) M, IERR
       REAL(C_DOUBLE) HMIN, HMAX, EPS, P, X, T, H, R
       DIMENSION X(M), R(*)
 
-      INTERFACE
-         SUBROUTINE F(M, T, X, Z, CONTEXT, IERR) BIND(C)
-         USE, INTRINSIC :: ISO_C_BINDING, ONLY: C_INT, C_DOUBLE,
-     &        C_PTR
-         INTEGER(C_INT), INTENT(IN) :: M
-         REAL(C_DOUBLE), INTENT(IN) :: T, X(*)
-         REAL(C_DOUBLE), INTENT(OUT) :: Z(*)
-         TYPE(C_PTR), VALUE :: CONTEXT
-         INTEGER(C_INT), INTENT(OUT) :: IERR
-         END SUBROUTINE F
-      END INTERFACE
+      PROCEDURE(rhs_callback) :: F
 
       INTEGER   ONE /1/, I, M2, M3, M4, M5, M6, M7, MM7, IDAMAX
-      DOUBLE PRECISION C, CDS /32.D0/, THETA, AMPL, EPS1, ZERO /0.D0/
+      DOUBLE PRECISION C, CDS /31.D0/, THETA, AMPL, EPS1, ZERO /0.D0/
       LOGICAL   BULD, BULHM, BULT
       DIMENSION C(21)
 
@@ -77,31 +68,31 @@ C TODO nullify it in calling code?
           R(I) = ZERO
 10    CONTINUE
 
-      CALL F     (M, T, X, R(M6), CONTEXT, IERR)
+      CALL F     (PC, M, T, X, R(M6), IERR)
       IF (IERR .NE. 0) GO TO 210
       CALL DAXPY (M, H, R(M6), ONE, R, ONE)
       CALL DCOPY (M, X, ONE, R(M7), ONE)
       CALL DAXPY (M, C(1), R, ONE, R(M7), ONE)
-      CALL F     (M, T + H*C(1), R(M7), R(M6), CONTEXT, IERR)
+      CALL F     (PC, M, T + H*C(1), R(M7), R(M6), IERR)
       IF (IERR .NE. 0) GO TO 210
       CALL DAXPY (M, H, R(M6), ONE, R(M2), ONE)
       CALL DCOPY (M, X, ONE, R(M7), ONE)
       CALL DAXPY (M, C(4), R, ONE, R(M7), ONE)
       CALL DAXPY (M, C(4), R(M2), ONE, R(M7), ONE)
-      CALL F     (M, T + H*C(1), R(M7), R(M6), CONTEXT, IERR)
+      CALL F     (PC, M, T + H*C(1), R(M7), R(M6), IERR)
       IF (IERR .NE. 0) GO TO 210
       CALL DAXPY (M, H, R(M6), ONE, R(M3), ONE)
       CALL DCOPY (M, X, ONE, R(M7), ONE)
       CALL DAXPY (M, C(21), R(M2), ONE, R(M7), ONE)
       CALL DAXPY (M, C(5), R(M3), ONE, R(M7), ONE)
-      CALL F     (M, T + H, R(M7), R(M6), CONTEXT, IERR)
+      CALL F     (PC, M, T + H, R(M7), R(M6), IERR)
       IF (IERR .NE. 0) GO TO 210
       CALL DAXPY (M, H, R(M6), ONE, R(M4), ONE)
       CALL DCOPY (M, X, ONE, R(M7), ONE)
       CALL DAXPY (M, C(6), R, ONE, R(M7), ONE)
       CALL DAXPY (M, C(7), R(M2), ONE, R(M7), ONE)
       CALL DAXPY (M, C(8), R(M4), ONE, R(M7), ONE)
-      CALL F     (M, T + H*C(2), R(M7), R(M6), CONTEXT, IERR)
+      CALL F     (PC, M, T + H*C(2), R(M7), R(M6), IERR)
       IF (IERR .NE. 0) GO TO 210
       CALL DAXPY (M, H, R(M6), ONE, R(M5), ONE)
       CALL DCOPY (M, X, ONE, R(M7), ONE)
@@ -110,7 +101,7 @@ C TODO nullify it in calling code?
       CALL DAXPY (M, C(11), R(M3), ONE, R(M7), ONE)
       CALL DAXPY (M, C(12), R(M4), ONE, R(M7), ONE)
       CALL DAXPY (M, C(13), R(M5), ONE, R(M7), ONE)
-      CALL F     (M, T + H*C(3), R(M7), R(M6), CONTEXT, IERR)
+      CALL F     (PC, M, T + H*C(3), R(M7), R(M6), IERR)
       IF (IERR .NE. 0) GO TO 210
       CALL DCOPY (M, R(M6), ONE, R(M2), ONE)
       CALL DSCAL (M, H, R(M2), ONE)

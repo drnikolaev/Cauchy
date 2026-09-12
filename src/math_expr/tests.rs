@@ -2,6 +2,17 @@ use super::{EvaluationError, MathExpr, Operation};
 use std::collections::HashMap;
 
 #[test]
+fn log_is_natural_logarithm_and_round_trips_symbolic_derivatives() {
+    let expression = MathExpr::<f64>::parse("x^x").unwrap().derive("x");
+    let source = expression.to_string();
+    assert!(source.contains("log(x)"));
+    let parsed = MathExpr::<f64>::parse(&source).unwrap();
+    let value = parsed.evaluate(&HashMap::from([("x", 2.0)])).unwrap();
+    assert!((value - 4.0 * (1.0 + 2.0_f64.ln())).abs() < 1e-12);
+    assert!(MathExpr::<f64>::parse("ln(x)").is_err());
+}
+
+#[test]
 fn evaluate_var() {
     let expression = MathExpr::<f64>::new_var("x");
     let val = expression.evaluate(&HashMap::from([("x", 1.0)]));
@@ -379,19 +390,19 @@ fn derive_sqrt() {
 }
 
 #[test]
-fn evaluate_ln() {
-    let expression = MathExpr::new_ln(MathExpr::new_const(std::f64::consts::E));
+fn evaluate_log() {
+    let expression = MathExpr::new_log(MathExpr::new_const(std::f64::consts::E));
     assert!((expression.evaluate(&HashMap::new()).unwrap() - 1.0).abs() < 1e-12);
 
-    let expression = MathExpr::new_ln(MathExpr::new_const(1.0_f32));
+    let expression = MathExpr::new_log(MathExpr::new_const(1.0_f32));
     assert_eq!(expression.evaluate(&HashMap::new()), Ok(0.0));
 }
 
 #[test]
-fn derive_ln() {
+fn derive_log() {
     let variable = MathExpr::<f64>::new_var("x");
     let square = MathExpr::new_power(variable, MathExpr::new_const(2.0));
-    let derivative = MathExpr::new_ln(square).derive("x").simplify();
+    let derivative = MathExpr::new_log(square).derive("x").simplify();
 
     assert_eq!(derivative.evaluate(&HashMap::from([("x", 2.0)])), Ok(1.0));
 }
@@ -450,7 +461,7 @@ fn parse_to_string_output() {
 
 #[test]
 fn parse_and_evaluate_complex_expression() {
-    let source = "sqrt(x ^ 2 + y ^ 2) + sin(theta) * exp(ln(scale)) - abs(offset) / log10(100)";
+    let source = "sqrt(x ^ 2 + y ^ 2) + sin(theta) * exp(log(scale)) - abs(offset) / log10(100)";
     let expression = MathExpr::<f64>::parse(source).unwrap();
     let args = HashMap::from([
         ("x", 3.0),
@@ -467,7 +478,7 @@ fn parse_and_evaluate_complex_expression() {
 
 #[test]
 fn parse_and_evaluate_complex_expression_derivatives() {
-    let source = "sqrt(x ^ 2 + Y ^ 2) + sin(theta) * exp(ln(scale)) - abs(offset) / log10(100)";
+    let source = "sqrt(x ^ 2 + Y ^ 2) + sin(theta) * exp(log(scale)) - abs(offset) / log10(100)";
     let expression = MathExpr::<f64>::parse(source).unwrap();
     let args = HashMap::from([
         ("x", 3.0),
@@ -591,10 +602,10 @@ fn parse_sqrt_and_formatting() {
 }
 
 #[test]
-fn parse_ln_and_formatting() {
-    let parsed = MathExpr::<f64>::parse("ln(x + 1)").unwrap();
+fn parse_log_and_formatting() {
+    let parsed = MathExpr::<f64>::parse("log(x + 1)").unwrap();
 
-    assert_eq!(parsed.to_string(), "ln((x + 1))");
+    assert_eq!(parsed.to_string(), "log((x + 1))");
     assert_eq!(MathExpr::<f64>::parse(&parsed.to_string()).unwrap(), parsed);
 }
 
@@ -650,6 +661,176 @@ fn simplify_repeated_terms() {
     assert_eq!(simplified.evaluate(&HashMap::from([("x", 3.0)])), Ok(12.0));
 }
 
+// Check tree shape, fixed-point behavior, and numerical agreement separately.
+fn assert_simplifies(input: &str, expected: &str) {
+    let expression = MathExpr::<f64>::parse(input).unwrap();
+    let simplified = expression.simplify();
+    // Parsing represents -2 as Negate(Constant(2)); normalize that literal
+    // spelling before comparing the expected algebraic form.
+    let mut expected_tree = MathExpr::parse(expected).unwrap();
+    fn fold_negative_literals(expression: &mut MathExpr<'_, f64>) {
+        for operand in &mut expression.operands {
+            fold_negative_literals(operand);
+        }
+        if let (super::Operation::Negate, [operand]) =
+            (&expression.operation, expression.operands.as_slice())
+            && let Some(value) = operand.constant_value()
+        {
+            *expression = MathExpr::new_const(-value);
+        }
+    }
+    fold_negative_literals(&mut expected_tree);
+    assert_eq!(simplified, expected_tree, "{input}");
+    assert_eq!(simplified.simplify(), simplified, "not idempotent: {input}");
+    for (x, y, z, t) in [
+        (-0.4, 0.7, 1.2, -1.0),
+        (0.0, 0.0, 0.0, 0.0),
+        (0.8, -0.3, -1.1, 1.0),
+    ] {
+        let args = HashMap::from([("x", x), ("y", y), ("z", z), ("t", t)]);
+        let before = expression.evaluate(&args).unwrap();
+        let after = simplified.evaluate(&args).unwrap();
+        assert!(
+            (before - after).abs() <= 1e-12 * (1.0 + before.abs()),
+            "{input}: {before} != {after}"
+        );
+    }
+}
+
+#[test]
+fn simplify_constants_across_products() {
+    assert_simplifies("(2*x)*(3*y)", "6*(x*y)");
+    assert_simplifies("(x*2)*(y*3)", "6*(x*y)");
+    assert_simplifies("2*(x*(3*y))", "6*(x*y)");
+    assert_simplifies("(2*x)*(0*y)", "0");
+}
+
+#[test]
+fn simplify_product_signs() {
+    assert_simplifies("(-x)*(-y)", "x*y");
+    assert_simplifies("(-x)*y", "-(x*y)");
+    assert_simplifies("-(2*x)", "-2*x");
+    assert_simplifies("-((-2*x)*y)", "2*(x*y)");
+    assert_simplifies("-(2*x)+3*x", "x");
+}
+
+#[test]
+fn simplify_terms_inside_negated_sums() {
+    assert_simplifies("x + (-(x+y))", "-y");
+    assert_simplifies("x + (-(x-y))", "y");
+    assert_simplifies("-(x+y)+x+y", "0");
+    assert_simplifies("-(x+2)+x+3", "1");
+}
+
+#[test]
+fn simplify_reordered_product_terms() {
+    assert_simplifies("x*y-y*x", "0");
+    assert_simplifies("2*x*y+3*y*x", "5*(x*y)");
+    assert_simplifies("(x*y)*z-z*(y*x)", "0");
+    assert_simplifies("sin(x)*cos(y)-cos(y)*sin(x)", "0");
+    assert_simplifies("x*y-x*z", "x*y+(-(x*z))");
+}
+
+#[test]
+fn simplify_repeated_product_factors() {
+    assert_simplifies("x*x", "x^2");
+    assert_simplifies("x^2*x^3", "x^5");
+    assert_simplifies("x*x^2*x", "x^4");
+    assert_simplifies("x*y*x", "x^2*y");
+    assert_simplifies("sin(x)*sin(x)", "sin(x)^2");
+    assert_simplifies("(2*x)*(3*x)", "6*x^2");
+}
+
+#[test]
+fn simplify_numeric_fraction_coefficients() {
+    assert_simplifies("(2*x)/2", "x");
+    assert_simplifies("(6*x)/3", "2*x");
+    assert_simplifies("x/2+x/2", "x");
+    assert_simplifies("(6*x)/(-3)", "-2*x");
+    assert_simplifies("(6*x*y)/3", "2*(x*y)");
+    assert_simplifies("(x/2)/4", "0.125*x");
+}
+
+#[test]
+fn simplify_base_one() {
+    assert_simplifies("1^x", "1");
+    assert_simplifies("1^(x+y)", "1");
+}
+
+#[test]
+fn simplify_absolute_value_identities() {
+    assert_simplifies("abs(abs(x))", "abs(x)");
+    assert_simplifies("abs(-x)", "abs(x)");
+    assert_simplifies("abs(-abs(-x))", "abs(x)");
+}
+
+#[test]
+fn simplify_odd_and_even_functions() {
+    for name in ["sin", "tan", "asin", "atan", "sinh", "tanh"] {
+        assert_simplifies(&format!("{name}(-x)"), &format!("-{name}(x)"));
+    }
+    for name in ["cos", "cosh"] {
+        assert_simplifies(&format!("{name}(-x)"), &format!("{name}(x)"));
+    }
+    assert_simplifies("sin(-2*x)", "-sin(2*x)");
+    assert_simplifies("cos(-2*x)", "cos(2*x)");
+    assert_simplifies("sin(-x)+sin(x)", "0");
+    assert_simplifies("acos(-x)", "acos(-x)");
+}
+
+#[test]
+fn simplify_identical_conditional_branches() {
+    assert_simplifies("iif(t,x,x)", "x");
+    assert_simplifies("iif(t,x+0,1*x)", "x");
+    assert_simplifies("iif(t,x*y,y*x)", "x*y");
+    assert_simplifies("iif(t,x,y)", "iif(t,x,y)");
+    // Algebraic simplification deliberately eliminates a redundant check.
+    let simplified = MathExpr::<f64>::parse("iif(undefined,x,x)")
+        .unwrap()
+        .simplify();
+    assert_eq!(simplified.evaluate(&HashMap::from([("x", 2.0)])), Ok(2.0));
+}
+
+#[test]
+fn preserve_unsafe_product_power_merges() {
+    for input in ["x^0.5*x^0.5", "x^-1*x", "x^-1*x^-1", "x^y*x^z"] {
+        let expression = MathExpr::<f64>::parse(input).unwrap();
+        assert_eq!(expression.simplify(), expression, "{input}");
+    }
+    let expression = MathExpr::<f64>::parse("x^0.5*x^0.5").unwrap().simplify();
+    assert!(
+        expression
+            .evaluate(&HashMap::from([("x", -1.0)]))
+            .unwrap()
+            .is_nan()
+    );
+    let expression = MathExpr::<f64>::parse("x^-1*x").unwrap().simplify();
+    assert!(
+        expression
+            .evaluate(&HashMap::from([("x", 0.0)]))
+            .unwrap()
+            .is_nan()
+    );
+}
+
+#[test]
+fn preserve_zero_and_extreme_numeric_divisors() {
+    for divisor in [0.0, f64::INFINITY, f64::NAN, 1e-320] {
+        let expression =
+            MathExpr::<f64>::new_divide(MathExpr::new_var("x"), MathExpr::new_const(divisor));
+        let simplified = expression.simplify();
+        assert!(matches!(simplified.operation, super::Operation::Divide));
+    }
+    let expression = MathExpr::<f64>::parse("(1e-300*x)/1e300").unwrap();
+    assert_eq!(expression.simplify(), expression);
+}
+
+#[test]
+fn simplify_product_rules_for_f32() {
+    let expression = MathExpr::<f32>::parse("(2*x)*(3*y)-(6*y)*x").unwrap();
+    assert_eq!(expression.simplify(), MathExpr::new_const(0.0));
+}
+
 #[test]
 fn simplify_like_terms_and_constants() {
     let expression = MathExpr::<f64>::parse("2*x + 3*x - x + 2 - 2").unwrap();
@@ -682,7 +863,7 @@ fn simplify_numeric_operations() {
 #[test]
 fn simplify_zero_quotient_cascades_through_expression() {
     let expression = MathExpr::<f64>::parse(
-        "(((2 * x) / (2 * sqrt(((x ^ 2) + (Y ^ 2))))) + (sin(theta) * ((0 / scale) * exp(ln(scale)))))",
+        "(((2 * x) / (2 * sqrt(((x ^ 2) + (Y ^ 2))))) + (sin(theta) * ((0 / scale) * exp(log(scale)))))",
     )
     .unwrap();
 
@@ -737,9 +918,9 @@ fn preserve_nested_power_with_fractional_exponent() {
 
 #[test]
 fn preserve_logarithm_of_power_during_simplification() {
-    let expression = MathExpr::<f64>::parse("ln(x ^ y)").unwrap();
+    let expression = MathExpr::<f64>::parse("log(x ^ y)").unwrap();
 
-    assert_eq!(expression.simplify().to_string(), "ln((x ^ y))");
+    assert_eq!(expression.simplify().to_string(), "log((x ^ y))");
 }
 
 #[test]
@@ -871,9 +1052,9 @@ fn simplify_sqrt_constant() {
 }
 
 #[test]
-fn simplify_ln_constant() {
+fn simplify_log_constant() {
     assert_eq!(
-        MathExpr::<f64>::parse("ln(1)")
+        MathExpr::<f64>::parse("log(1)")
             .unwrap()
             .simplify()
             .to_string(),

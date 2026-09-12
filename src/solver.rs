@@ -1,47 +1,76 @@
-//! Adaptive ODE integration with the Fortran England solver.
+//! Adaptive integration with the Fortran England, Lawson and Rosenbrock solvers.
 
 use crate::math_expr::{MathExpr, ParseError};
+use crate::{OdeSystem, SystemKind};
 use std::collections::HashMap;
-use std::ffi::{c_double, c_int, c_void};
+use std::ffi::c_int;
 use std::fmt::{Display, Formatter};
-use std::panic::{AssertUnwindSafe, catch_unwind};
+mod ffi;
 
-type RhsCallback = unsafe extern "C" fn(
-    *const c_int,
-    *const c_double,
-    *const c_double,
-    *mut c_double,
-    *mut c_void,
-    *mut c_int,
-);
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Method {
+    #[default]
+    England,
+    Lawson,
+    LawsonLinear,
+    LawsonSplit,
+    Rosenbrock,
+    RosenbrockAutonomous,
+}
 
-unsafe extern "C" {
-    fn cauchy_sengl(
-        callback: RhsCallback,
-        context: *mut c_void,
-        dimension: *const c_int,
-        min_step: *const c_double,
-        max_step: *const c_double,
-        tolerance: *const c_double,
-        relative_threshold: *const c_double,
-        state: *mut c_double,
-        time: *mut c_double,
-        step: *mut c_double,
-        work: *mut c_double,
-        info: *mut c_int,
-    );
+impl Method {
+    pub fn supports(self, kind: SystemKind) -> bool {
+        match self {
+            Self::LawsonLinear => kind == SystemKind::TimeLinear,
+            Self::LawsonSplit => kind == SystemKind::ConstantLinear,
+            Self::RosenbrockAutonomous => kind == SystemKind::Autonomous,
+            _ => true,
+        }
+    }
+
+    fn workspace_len(self, dimension: usize) -> Result<usize, SolverError> {
+        let (quadratic, linear) = match self {
+            Self::England => (0, 7),
+            Self::Lawson | Self::Rosenbrock => (6, 6),
+            Self::LawsonLinear => (7, 5),
+            Self::LawsonSplit => (5, 6),
+            Self::RosenbrockAutonomous => (6, 4),
+        };
+        let len = dimension
+            .checked_mul(dimension)
+            .and_then(|square| square.checked_mul(quadratic))
+            .and_then(|square| {
+                dimension
+                    .checked_mul(linear)
+                    .and_then(|v| square.checked_add(v))
+            })
+            .filter(|&len| c_int::try_from(len).is_ok());
+        // INV also allocates 64*M doubles for LAPACK work.
+        if dimension
+            .checked_mul(64)
+            .is_none_or(|v| c_int::try_from(v).is_err())
+        {
+            return Err(SolverError::InvalidInput(
+                "system is too large for the Fortran integer ABI",
+            ));
+        }
+        len.ok_or(SolverError::InvalidInput(
+            "system is too large for the Fortran integer ABI",
+        ))
+    }
 }
 
 /// Integration controls. Step sizes are positive magnitudes; the integration
 /// direction is determined by the start and end times.
 #[derive(Clone, Debug)]
 pub struct Solver {
+    pub method: Method,
     pub initial_step: f64,
     pub min_step: f64,
     pub max_step: f64,
-    /// SENGL's local error tolerance (EPS), not a global error bound.
+    /// Local error tolerance (EPS), not a global error bound.
     pub tolerance: f64,
-    /// SENGL uses relative error when max(abs(state)) >= this threshold,
+    /// Solvers use relative error when max(abs(state)) >= this threshold,
     /// and absolute error below it (P).
     pub relative_threshold: f64,
     /// Maximum number of accepted steps, excluding the initial point.
@@ -51,6 +80,7 @@ pub struct Solver {
 impl Default for Solver {
     fn default() -> Self {
         Self {
+            method: Method::England,
             initial_step: 0.01,
             min_step: 1e-12,
             max_step: 0.1,
@@ -67,11 +97,15 @@ impl Default for Solver {
 pub struct Solution {
     pub times: Vec<f64>,
     pub states: Vec<Vec<f64>>,
+    /// Signed recommended next step at each point (initial step at index zero).
+    /// Actual accepted steps are successive differences in `times`.
+    pub recommended_steps: Vec<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SolverError {
     InvalidInput(&'static str),
+    IncompatibleMethod { method: Method, system: SystemKind },
     Parse { equation: usize, source: ParseError },
     Evaluation { equation: usize, message: String },
     NonFiniteDerivative { equation: usize, time: f64 },
@@ -87,6 +121,9 @@ impl Display for SolverError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidInput(message) => f.write_str(message),
+            Self::IncompatibleMethod { method, system } => {
+                write!(f, "{method:?} does not support {system:?} systems")
+            }
             Self::Parse { equation, source } => write!(f, "equation {equation}: {source}"),
             Self::Evaluation { equation, message } => {
                 write!(f, "equation {equation}: {message}")
@@ -101,7 +138,7 @@ impl Display for SolverError {
             Self::StepSizeTooSmall { time } => {
                 write!(
                     f,
-                    "SENGL cannot meet the tolerance at the minimum step at t={time}"
+                    "solver cannot meet the tolerance at the minimum step at t={time}"
                 )
             }
             Self::StepLimitExceeded { time } => write!(f, "step limit reached at t={time}"),
@@ -109,7 +146,7 @@ impl Display for SolverError {
                 write!(f, "step cannot advance floating-point time at t={time}")
             }
             Self::CallbackPanicked => f.write_str("expression evaluation panicked"),
-            Self::FortranFailure { info } => write!(f, "SENGL failed with IERR={info}"),
+            Self::FortranFailure { info } => write!(f, "Fortran solver failed with IERR={info}"),
         }
     }
 }
@@ -128,11 +165,11 @@ impl Solver {
     /// The expression may use `t`, `x` (also `x0`), and MathExpr functions.
     ///
     /// ```
-    /// use cauchy::Solver;
+    /// use cauchy_ode::Solver;
     /// let solution = Solver::default().solve("x", 0.0, 1.0, 1.0)?;
     /// let x = solution.states.last().unwrap()[0];
     /// assert!((x - std::f64::consts::E).abs() < 1e-7);
-    /// # Ok::<(), cauchy::SolverError>(())
+    /// # Ok::<(), cauchy_ode::SolverError>(())
     /// ```
     pub fn solve(
         &self,
@@ -158,37 +195,59 @@ impl Solver {
         initial_state: &[f64],
         end_time: f64,
     ) -> Result<Solution, SolverError> {
-        self.validate(rhs, start_time, initial_state, end_time)?;
-        // SENGL computes indices up to 7*M using the BLAS integer ABI.
-        let work_len = initial_state
-            .len()
-            .checked_mul(7)
-            .filter(|&len| c_int::try_from(len).is_ok())
-            .ok_or(SolverError::InvalidInput(
-                "system is too large for the Fortran integer ABI",
-            ))?;
-        let dimension = initial_state.len() as c_int;
+        let names: Vec<_> = (0..rhs.len()).map(|i| format!("x{i}")).collect();
+        let names: Vec<_> = names.iter().map(String::as_str).collect();
         let expressions = rhs
             .iter()
             .enumerate()
             .map(|(equation, source)| {
-                MathExpr::<f64>::parse(source)
-                    .map_err(|source| SolverError::Parse { equation, source })
+                let expression = MathExpr::parse(source)
+                    .map_err(|source| SolverError::Parse { equation, source })?;
+                // Only the convenience API defines x as an alias for scalar x0.
+                // Normalize before building Jacobians, without a text round-trip.
+                Ok(if names.len() == 1 {
+                    expression.substitute("x", &MathExpr::new_var("x0"))
+                } else {
+                    expression
+                })
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        let mut context = CallbackContext {
-            expressions,
-            names: (0..initial_state.len()).map(|i| format!("x{i}")).collect(),
-            error: None,
+            .collect::<Result<Vec<_>, SolverError>>()?;
+        let (time, kind) = if self.method == Method::RosenbrockAutonomous {
+            (None, SystemKind::Autonomous)
+        } else {
+            (Some("t"), SystemKind::General)
         };
+        let system = OdeSystem::from_expressions(time, &names, expressions, kind)?;
+        self.solve_problem(&system, start_time, initial_state, end_time)
+    }
+
+    /// Integrates a reusable parsed system with this solver's selected method.
+    /// Named variables and structured linear forms are specified by OdeSystem.
+    pub fn solve_problem(
+        &self,
+        system: &OdeSystem<'_>,
+        start_time: f64,
+        initial_state: &[f64],
+        end_time: f64,
+    ) -> Result<Solution, SolverError> {
+        self.validate(system.dimension(), start_time, initial_state, end_time)?;
+        if !self.method.supports(system.kind()) {
+            return Err(SolverError::IncompatibleMethod {
+                method: self.method,
+                system: system.kind(),
+            });
+        }
+        let work_len = self.method.workspace_len(system.dimension())?;
+        let mut context = CallbackContext::new(system, self.method);
+        let direction = (end_time - start_time).signum();
         let mut solution = Solution {
             times: vec![start_time],
             states: vec![initial_state.to_vec()],
+            recommended_steps: vec![direction * self.initial_step],
         };
         let mut time = start_time;
         let mut state = initial_state.to_vec();
         let mut work = vec![0.0; work_len];
-        let direction = (end_time - start_time).signum();
         let mut step = direction * self.initial_step;
         let mut steps = 0;
 
@@ -207,29 +266,15 @@ impl Solver {
                 return Err(SolverError::NoProgress { time });
             }
             let previous_time = time;
-            let mut info = 0;
-
-            // SAFETY: SENGL calls the callback synchronously and retains no
-            // pointers. Context and all buffers live for the complete call.
-            // X has M elements and R has 7*M elements, with indices fitting
-            // c_int. All scalars are passed by reference except the context
-            // and function pointer, matching the Fortran BIND(C) interface.
-            unsafe {
-                cauchy_sengl(
-                    evaluate_rhs,
-                    (&mut context as *mut CallbackContext<'_>).cast(),
-                    &dimension,
-                    &min_step,
-                    &self.max_step,
-                    &self.tolerance,
-                    &self.relative_threshold,
-                    state.as_mut_ptr(),
-                    &mut time,
-                    &mut step,
-                    work.as_mut_ptr(),
-                    &mut info,
-                );
-            }
+            let info = ffi::step(
+                self,
+                &mut context,
+                min_step,
+                &mut state,
+                &mut time,
+                &mut step,
+                &mut work,
+            );
             if let Some(error) = context.error.take() {
                 return Err(error);
             }
@@ -246,6 +291,7 @@ impl Solver {
             }
             solution.times.push(time);
             solution.states.push(state.clone());
+            solution.recommended_steps.push(step);
             steps += 1;
         }
         Ok(solution)
@@ -253,12 +299,12 @@ impl Solver {
 
     fn validate(
         &self,
-        rhs: &[&str],
+        dimension: usize,
         start_time: f64,
         initial_state: &[f64],
         end_time: f64,
     ) -> Result<(), SolverError> {
-        if rhs.is_empty() || rhs.len() != initial_state.len() {
+        if dimension == 0 || dimension != initial_state.len() {
             return Err(SolverError::InvalidInput(
                 "provide one RHS per state component and at least one component",
             ));
@@ -298,37 +344,95 @@ impl Solver {
     }
 }
 
-struct CallbackContext<'a> {
-    expressions: Vec<MathExpr<'a, f64>>,
-    names: Vec<String>,
+#[derive(Clone, Copy)]
+enum CallbackKind {
+    Rhs,
+    Jacobian,
+    TimeDerivative,
+    Matrix,
+    Forcing,
+}
+
+struct CallbackContext<'s, 'a> {
+    system: &'s OdeSystem<'a>,
+    jacobian: Vec<MathExpr<'a, f64>>,
+    time_derivative: Vec<MathExpr<'a, f64>>,
+    variables: HashMap<&'a str, f64>,
+    current_time: f64,
     error: Option<SolverError>,
 }
 
-impl CallbackContext<'_> {
+impl<'s, 'a> CallbackContext<'s, 'a> {
+    fn new(system: &'s OdeSystem<'a>, method: Method) -> Self {
+        let mut jacobian = Vec::new();
+        if matches!(
+            method,
+            Method::Lawson | Method::Rosenbrock | Method::RosenbrockAutonomous
+        ) {
+            // Column-major: each column differentiates every RHS by one variable.
+            for name in &system.names {
+                for expression in &system.rhs {
+                    jacobian.push(expression.derive(name).simplify());
+                }
+            }
+        }
+        let time_derivative = if method == Method::Rosenbrock {
+            system
+                .rhs
+                .iter()
+                .map(|expression| match system.time {
+                    Some(time) => expression.derive(time).simplify(),
+                    None => MathExpr::new_const(0.0),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let variables = system
+            .names
+            .iter()
+            .copied()
+            .chain(system.time)
+            .map(|name| (name, 0.0))
+            .collect();
+        Self {
+            system,
+            jacobian,
+            time_derivative,
+            variables,
+            current_time: 0.0,
+            error: None,
+        }
+    }
+
     fn evaluate(
-        &self,
+        &mut self,
         time: f64,
         state: &[f64],
         derivative: &mut [f64],
+        kind: CallbackKind,
     ) -> Result<(), SolverError> {
         if !time.is_finite() || !state.iter().all(|x| x.is_finite()) {
             return Err(SolverError::NonFiniteState { time });
         }
-        let mut variables: HashMap<&str, f64> = self
-            .names
-            .iter()
-            .zip(state)
-            .map(|(name, &value)| (name.as_str(), value))
-            .collect();
-        variables.insert("t", time);
-        if state.len() == 1 {
-            variables.insert("x", state[0]);
+        for (&name, &value) in self.system.names.iter().zip(state) {
+            self.variables.insert(name, value);
         }
-        for (equation, (expression, output)) in self.expressions.iter().zip(derivative).enumerate()
-        {
+        if let Some(name) = self.system.time {
+            self.variables.insert(name, time);
+        }
+        let expressions = match kind {
+            CallbackKind::Rhs => &self.system.rhs,
+            CallbackKind::Jacobian => &self.jacobian,
+            CallbackKind::TimeDerivative => &self.time_derivative,
+            CallbackKind::Matrix => &self.system.matrix,
+            CallbackKind::Forcing => &self.system.forcing,
+        };
+        assert_eq!(expressions.len(), derivative.len());
+        for (equation, (expression, output)) in expressions.iter().zip(derivative).enumerate() {
             let value =
                 expression
-                    .evaluate(&variables)
+                    .evaluate(&self.variables)
                     .map_err(|error| SolverError::Evaluation {
                         equation,
                         message: format!("{error:?}"),
@@ -340,32 +444,4 @@ impl CallbackContext<'_> {
         }
         Ok(())
     }
-}
-
-// Only SENGL invokes this private callback. Its input and output buffers are
-// non-overlapping and contain M doubles; scalars and context are valid for the
-// duration of each call. No Rust unwind is allowed to cross the FFI boundary.
-unsafe extern "C" fn evaluate_rhs(
-    dimension: *const c_int,
-    time: *const c_double,
-    state: *const c_double,
-    derivative: *mut c_double,
-    context: *mut c_void,
-    info: *mut c_int,
-) {
-    let context = unsafe { &mut *context.cast::<CallbackContext<'_>>() };
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        let dimension = unsafe { *dimension } as usize;
-        let time = unsafe { *time };
-        let state = unsafe { std::slice::from_raw_parts(state, dimension) };
-        let derivative = unsafe { std::slice::from_raw_parts_mut(derivative, dimension) };
-        context.evaluate(time, state, derivative)
-    }));
-    let error = match result {
-        Ok(Ok(())) => None,
-        Ok(Err(error)) => Some(error),
-        Err(_) => Some(SolverError::CallbackPanicked),
-    };
-    unsafe { *info = if error.is_some() { -1 } else { 0 } };
-    context.error = error;
 }

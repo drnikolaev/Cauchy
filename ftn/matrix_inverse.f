@@ -1,5 +1,5 @@
-      SUBROUTINE CAUCHY_MATRIX_INVERSE(N, A, AINV, IPIV, WORK,
-     &     LWORK, INFO) BIND(C, NAME="cauchy_matrix_inverse")
+      SUBROUTINE CAUCHY_ODE_MATRIX_INVERSE(N, A, AINV, IPIV, WORK,
+     &     LWORK, INFO) BIND(C, NAME="cauchy_ode_matrix_inverse")
 C     A and AINV use Fortran column-major order.
       USE, INTRINSIC :: ISO_C_BINDING, ONLY: C_INT, C_DOUBLE
       IMPLICIT NONE
@@ -26,4 +26,4 @@ C     A and AINV use Fortran column-major order.
       CALL DGETRF(N, N, AINV, N, IPIV, INFO)
       IF (INFO .NE. 0) RETURN
       CALL DGETRI(N, AINV, N, IPIV, WORK, LWORK, INFO)
-      END SUBROUTINE CAUCHY_MATRIX_INVERSE
+      END SUBROUTINE CAUCHY_ODE_MATRIX_INVERSE

@@ -1,4 +1,4 @@
-use cauchy::fortran::matrix_exp;
+use cauchy_ode::fortran::matrix_exp;
 
 #[test]
 fn call_fortran_matrix_exp_from_rust() {

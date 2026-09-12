@@ -1,4 +1,4 @@
-use cauchy::fortran::evaluate_math_expr_from_fortran;
+use cauchy_ode::fortran::evaluate_math_expr_from_fortran;
 
 #[test]
 fn fortran_calls_rust_evaluate_and_returns_answer_by_reference() {

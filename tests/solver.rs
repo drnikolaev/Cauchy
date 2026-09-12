@@ -1,4 +1,4 @@
-use cauchy::{Solver, SolverError};
+use cauchy_ode::{Solver, SolverError};
 
 fn assert_close(actual: f64, expected: f64, tolerance: f64) {
     assert!(
@@ -98,10 +98,10 @@ fn rejects_invalid_expression_and_unknown_variable() {
 #[test]
 fn propagates_callback_failure_at_later_stage_and_recovers() {
     let solver = Solver::default();
-    // The missing variable is only evaluated once a stage's t exceeds 0.025.
+    // Parsing succeeds; evaluation fails only once a stage's t exceeds 0.025.
     assert!(matches!(
-        solver.solve("iif(0.025-t, missing, 1)", 0.0, 0.0, 1.0),
-        Err(SolverError::Evaluation { .. })
+        solver.solve("sqrt(0.025-t)", 0.0, 0.0, 1.0),
+        Err(SolverError::NonFiniteDerivative { time, .. }) if time > 0.025
     ));
     let solution = solver.solve("1", 0.0, 0.0, 0.1).unwrap();
     assert_close(solution.states.last().unwrap()[0], 0.1, 1e-14);

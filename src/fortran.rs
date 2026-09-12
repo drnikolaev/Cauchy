@@ -4,7 +4,7 @@ use std::ffi::{c_char, c_double, c_int};
 use std::fmt::{Display, Formatter};
 
 unsafe extern "C" {
-    fn cauchy_fortran_evaluate_math_expr(
+    fn cauchy_ode_fortran_evaluate_math_expr(
         source: *const c_char,
         source_len: c_int,
         x: *const c_double,
@@ -12,7 +12,7 @@ unsafe extern "C" {
         answer: *mut c_double,
         info: *mut c_int,
     );
-    fn cauchy_matrix_exp(
+    fn cauchy_ode_matrix_exp(
         n: c_int,
         matrix: *const c_double,
         precision: c_double,
@@ -20,7 +20,7 @@ unsafe extern "C" {
         work: *mut c_double,
         info: *mut c_int,
     );
-    fn cauchy_matrix_inverse(
+    fn cauchy_ode_matrix_inverse(
         n: c_int,
         matrix: *const c_double,
         inverse: *mut c_double,
@@ -39,7 +39,7 @@ unsafe extern "C" {
 /// readable doubles (or may be null when `x_len` is zero), and `answer` must
 /// point to writable storage for one `c_double`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cauchy_evaluate_math_expr(
+pub unsafe extern "C" fn cauchy_ode_evaluate_math_expr(
     source: *const c_char,
     source_len: c_int,
     x: *const c_double,
@@ -119,7 +119,7 @@ pub fn evaluate_math_expr_from_fortran(source: &str, x: &[f64]) -> Result<f64, c
     let mut info = 0;
 
     unsafe {
-        cauchy_fortran_evaluate_math_expr(
+        cauchy_ode_fortran_evaluate_math_expr(
             source.as_ptr().cast::<c_char>(),
             source_len,
             x.as_ptr().cast::<c_double>(),
@@ -168,7 +168,7 @@ pub fn matrix_exp(matrix: &[f64], order: usize, precision: f64) -> Vec<f64> {
     let mut info = 0;
 
     unsafe {
-        cauchy_matrix_exp(
+        cauchy_ode_matrix_exp(
             n,
             matrix.as_ptr(),
             precision,
@@ -213,7 +213,7 @@ pub fn matrix_inverse(matrix: &[f64], order: usize) -> Result<Vec<f64>, MatrixIn
     let mut info = 0;
 
     unsafe {
-        cauchy_matrix_inverse(
+        cauchy_ode_matrix_inverse(
             n,
             matrix.as_ptr(),
             inverse.as_mut_ptr(),

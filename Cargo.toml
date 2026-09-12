@@ -1,10 +1,8 @@
 [package]
-name = "cauchy"
+name = "cauchy-ode"
 version = "0.1.0"
 edition = "2024"
-
-[lib]
-name = "cauchy"
+description = "Adaptive stiff and non-stiff ODE solvers with symbolic expressions, automatic Jacobians, and Fortran-backed algorithms"
 
 [dependencies]
 num-traits = "0.2"

@@ -1,5 +1,5 @@
-      SUBROUTINE CAUCHY_MATRIX_EXP(N, A, TOL, E, WORK, INFO)
-     &     BIND(C, NAME="cauchy_matrix_exp")
+      SUBROUTINE CAUCHY_ODE_MATRIX_EXP(N, A, TOL, E, WORK, INFO)
+     &     BIND(C, NAME="cauchy_ode_matrix_exp")
 C     A, E, and the matrix workspaces use Fortran column-major order.
       USE, INTRINSIC :: ISO_C_BINDING, ONLY: C_INT, C_DOUBLE
       IMPLICIT NONE
@@ -73,4 +73,4 @@ C     A, E, and the matrix workspaces use Fortran column-major order.
       CALL DCOPY(NN, WORK(NN + 1), 1, E, 1)
       NSCALE = NSCALE - 1
       GO TO 70
-      END SUBROUTINE CAUCHY_MATRIX_EXP
+      END SUBROUTINE CAUCHY_ODE_MATRIX_EXP

@@ -1,0 +1,39 @@
+name: Ubuntu ARM64
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gfortran libblas-dev liblapack-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify native ARM64 toolchain
+        run: |
+          test "$(uname -m)" = aarch64
+          rustc -vV
+          gfortran --version
+      - name: Build all targets
+        run: cargo build --locked --release --all-targets
+      - name: Test debug and release builds
+        run: |
+          cargo test --locked
+          cargo test --locked --release
+      - name: Run examples
+        run: |
+          cargo run --locked --release --example hello_world
+          for demo in lorenz rossler thomas aizawa; do
+            cargo run --locked --release --example "$demo" -- --no-open
+            test -s "target/$demo.html"
+          done

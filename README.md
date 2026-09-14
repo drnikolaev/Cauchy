@@ -79,11 +79,52 @@ The build links the sequential LP64 oneMKL libraries, matching the Fortran
 pools. When distributing an executable, include the corresponding Intel
 Fortran and oneMKL redistributable runtimes.
 
-### Linux and macOS (GNU Fortran)
+### Ubuntu Linux (ARM64 / aarch64)
 
-Install `gfortran` and, on Linux, BLAS/LAPACK development libraries (for example,
-`sudo apt install gfortran libblas-dev liblapack-dev` on Debian/Ubuntu).
-On macOS, install GCC with `brew install gcc`; Accelerate is supplied by macOS.
+The project builds and runs natively on Ubuntu 24.04 LTS ARM64 with GNU
+Fortran and Ubuntu's BLAS/LAPACK libraries. Use current stable Rust from
+[rustup](https://rustup.rs/) (the crate uses Rust edition 2024). On an ARM64
+Ubuntu installation, rustup selects `aarch64-unknown-linux-gnu` automatically.
+
+Install the native build dependencies, then build and test from the repository:
+
+```bash
+sudo apt update
+sudo apt install build-essential gfortran libblas-dev liblapack-dev
+cargo build --locked --release --all-targets
+cargo test --locked
+cargo test --locked --release
+```
+
+Run the console example or generate an interactive attractor viewer:
+
+```bash
+cargo run --locked --release --example hello_world
+cargo run --locked --release --example lorenz -- --no-open
+```
+
+The second command writes `target/lorenz.html`, which you can open in a web
+browser. On Ubuntu Desktop, omit `--no-open` to launch the browser through
+`xdg-open` (provided by `xdg-utils`). Use `--no-open` on servers or over SSH.
+This package is a library with runnable examples; select an example with
+`--example` when using `cargo run`.
+
+The build uses `gfortran` and `ar` from `PATH`. Set `FC` or `AR` to override
+these executables; their values must be executable names or paths without
+extra flags. Use the standard BLAS/LAPACK packages above, which have 32-bit
+Fortran integers matching the Rust FFI even on ARM64. If copying executables
+to another compatible Ubuntu ARM64 machine, install the runtime packages
+`libgfortran5 libblas3 liblapack3` there as well.
+
+The [Ubuntu ARM64 workflow](.github/workflows/ubuntu-arm64.yml) builds all
+targets, runs debug and release tests, and runs all five examples on a native
+`ubuntu-24.04-arm` runner. This covers 64-bit ARM; 32-bit ARM is not verified.
+
+### Other Linux distributions and macOS (GNU Fortran)
+
+Install `gfortran`, a C linker and archiver, and, on Linux, BLAS/LAPACK
+development libraries using your distribution's package manager. On macOS,
+install GCC with `brew install gcc`; Accelerate is supplied by macOS.
 Then run `cargo build --release` and `cargo test`. Set `FC` if the GNU Fortran
 executable has a versioned name or a custom path, and `AR` to override `ar`.
 

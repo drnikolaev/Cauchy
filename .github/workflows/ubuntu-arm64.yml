@@ -33,7 +33,7 @@ jobs:
       - name: Run examples
         run: |
           cargo run --locked --release --example hello_world
-          for demo in lorenz rossler thomas aizawa; do
+          for demo in lorenz rossler thomas aizawa halvorsen four_wing dadras; do
             cargo run --locked --release --example "$demo" -- --no-open
             test -s "target/$demo.html"
           done

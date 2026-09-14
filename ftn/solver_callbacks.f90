@@ -1,3 +1,7 @@
+! SPDX-License-Identifier: BSL-1.0
+! Distributed under the Boost Software License, Version 1.0.
+! See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
 ! Explicit callback interfaces shared by the legacy solver routines.
 ! PC is an opaque C pointer passed by reference, never a 32-bit integer.
 module cauchy_ode_callbacks

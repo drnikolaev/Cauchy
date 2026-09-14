@@ -1,3 +1,7 @@
+C SPDX-License-Identifier: BSL-1.0
+C Distributed under the Boost Software License, Version 1.0.
+C See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
       SUBROUTINE CAUCHY_ODE_MATRIX_EXP(N, A, TOL, E, WORK, INFO)
      &     BIND(C, NAME="cauchy_ode_matrix_exp")
 C     A, E, and the matrix workspaces use Fortran column-major order.

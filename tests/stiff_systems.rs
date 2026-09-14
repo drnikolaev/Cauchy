@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: BSL-1.0
+// Distributed under the Boost Software License, Version 1.0.
+// See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
 //! Multiscale regressions: accuracy AND progress beyond the fast time scale.
 use cauchy_ode::{Method, OdeSystem, Solution, Solver, SolverError};
 use std::collections::HashMap;

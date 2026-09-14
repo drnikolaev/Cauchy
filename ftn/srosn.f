@@ -1,9 +1,10 @@
+C SPDX-License-Identifier: BSL-1.0
 C     Rosenbrock ODE numerical method with precision control for systems x'=f(t,x)
 
 C          Copyright Sergei Nikolaev 1992-2026
 C Distributed under the Boost Software License, Version 1.0.
-C    (See accompanying file LICENSE_1_0.txt or copy at
-C          http://www.boost.org/LICENSE_1_0.txt)
+C    (See accompanying file LICENSE or copy at
+C          https://www.boost.org/LICENSE_1_0.txt)
 
 C     F    - SUBROUTINE F(PC,M,T,X,FX,IERR) computes vector f(t,x)
 C     FJ   - SUBROUTINE FJ(PC,M,T,X,XJ,IERR) computes Jacobi matrix FJ(t,x)

@@ -1,9 +1,10 @@
+C SPDX-License-Identifier: BSL-1.0
 C     England ODE numerical method step with precision control
 
 C          Copyright Sergei Nikolaev 1992-2026
 C Distributed under the Boost Software License, Version 1.0.
-C    (See accompanying file LICENSE_1_0.txt or copy at
-C          http://www.boost.org/LICENSE_1_0.txt)
+C    (See accompanying file LICENSE or copy at
+C          https://www.boost.org/LICENSE_1_0.txt)
 
 C     F    - BIND(C) callback F(PC,M,T,X,Z,IERR) computes Z(T,X)
 C     PC   - opaque caller-owned C pointer, passed by reference

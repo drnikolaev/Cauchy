@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: BSL-1.0
+// Distributed under the Boost Software License, Version 1.0.
+// See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
 //! Parsed ODEs, independent of the algorithm used to integrate them.
 use crate::{MathExpr, SolverError};
 use std::collections::{HashMap, HashSet};
@@ -29,8 +33,8 @@ pub struct OdeSystem<'a> {
 impl<'a> OdeSystem<'a> {
     /// Creates x' = F(t,x). Names and expressions are borrowed; parsing happens
     /// only here, so a system can be reused for multiple solves.
-    pub fn new(time: &'a str, names: &[&'a str], rhs: &[&'a str]) -> Result<Self, SolverError> {
-        Self::new_with_parameters(time, names, rhs, &[])
+    pub fn general(time: &'a str, names: &[&'a str], rhs: &[&'a str]) -> Result<Self, SolverError> {
+        Self::general_with_parameters(time, names, rhs, &[])
     }
 
     /// Creates a general system with named, finite constant parameters.
@@ -41,14 +45,14 @@ impl<'a> OdeSystem<'a> {
     ///
     /// ```
     /// use cauchy_ode::{OdeSystem, Solver};
-    /// let system = OdeSystem::new_with_parameters(
+    /// let system = OdeSystem::general_with_parameters(
     ///     "clock", &["position"], &["-rate*position"], &[("rate", 2.0)],
     /// )?;
     /// let trajectory = Solver::default().solve_problem(&system, 0.0, &[1.0], 1.0)?;
     /// assert!((trajectory.states.last().unwrap()[0] - (-2.0_f64).exp()).abs() < 1e-6);
     /// # Ok::<(), cauchy_ode::SolverError>(())
     /// ```
-    pub fn new_with_parameters(
+    pub fn general_with_parameters(
         time: &'a str,
         names: &[&'a str],
         rhs: &[&'a str],
@@ -57,13 +61,28 @@ impl<'a> OdeSystem<'a> {
         Self::parse(Some(time), names, rhs, SystemKind::General, parameters)
     }
 
+    /// Compatibility alias for [`Self::general`].
+    pub fn new(time: &'a str, names: &[&'a str], rhs: &[&'a str]) -> Result<Self, SolverError> {
+        Self::general(time, names, rhs)
+    }
+
+    /// Compatibility alias for [`Self::general_with_parameters`].
+    pub fn new_with_parameters(
+        time: &'a str,
+        names: &[&'a str],
+        rhs: &[&'a str],
+        parameters: &[(&str, f64)],
+    ) -> Result<Self, SolverError> {
+        Self::general_with_parameters(time, names, rhs, parameters)
+    }
+
     /// Creates x' = F(x). Time-dependent expressions are rejected.
     pub fn autonomous(names: &[&'a str], rhs: &[&'a str]) -> Result<Self, SolverError> {
         Self::autonomous_with_parameters(names, rhs, &[])
     }
 
     /// Creates an autonomous system with constant bindings; see
-    /// [`Self::new_with_parameters`] for the binding rules.
+    /// [`Self::general_with_parameters`] for the binding rules.
     pub fn autonomous_with_parameters(
         names: &[&'a str],
         rhs: &[&'a str],
@@ -73,7 +92,7 @@ impl<'a> OdeSystem<'a> {
     }
 
     /// Creates x' = A(t)x + phi(t). A and phi may depend only on the named time
-    /// variable. For state-dependent forcing use `new` with the complete RHS,
+    /// variable. For state-dependent forcing use [`Self::general`] with the complete RHS,
     /// or `split` when the linear matrix is constant.
     pub fn linear(
         time: &'a str,

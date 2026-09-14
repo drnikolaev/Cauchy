@@ -1,9 +1,10 @@
+C SPDX-License-Identifier: BSL-1.0
 C     Lawson ODE numerical method step with precision control for systems x' = Bx + u(t,x) with constant matrix B
 
 C          Copyright Sergei Nikolaev 1992-2026
 C Distributed under the Boost Software License, Version 1.0.
-C    (See accompanying file LICENSE_1_0.txt or copy at
-C          http://www.boost.org/LICENSE_1_0.txt)
+C    (See accompanying file LICENSE or copy at
+C          https://www.boost.org/LICENSE_1_0.txt)
 
 C     B    - [input] matrix B of MxM DOUBLE PRECISION elements
 C     FU   - SUBROUTINE FU(PC,M,T,X,U,IERR) computes vactor u(t,x)

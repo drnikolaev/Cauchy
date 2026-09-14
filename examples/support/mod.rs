@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: BSL-1.0
+// Distributed under the Boost Software License, Version 1.0.
+// See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
 //! Shared runner for the offline attractor demos.
 use cauchy_ode::{Method, OdeSystem, Solver};
 use std::error::Error;

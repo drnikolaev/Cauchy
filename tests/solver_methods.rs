@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: BSL-1.0
+// Distributed under the Boost Software License, Version 1.0.
+// See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
 use cauchy_ode::{Method, OdeSystem, Solver, SolverError};
 
 const METHODS: [Method; 6] = [
@@ -31,7 +35,7 @@ fn oscillator(method: Method) -> OdeSystem<'static> {
             OdeSystem::split("t", &["q", "v"], &[0.0, -1.0, 1.0, 0.0], &["0", "0"])
         }
         Method::RosenbrockAutonomous => OdeSystem::autonomous(&["q", "v"], &["v", "-q"]),
-        _ => OdeSystem::new("t", &["q", "v"], &["v", "-q"]),
+        _ => OdeSystem::general("t", &["q", "v"], &["v", "-q"]),
     }
     .unwrap()
 }
@@ -172,7 +176,7 @@ fn all_methods_report_minimum_step_failure() {
             Method::LawsonLinear => OdeSystem::linear("t", &["x"], &["t^2"], &["1"]),
             Method::LawsonSplit => OdeSystem::split("t", &["x"], &[0.0], &["-x^2"]),
             Method::RosenbrockAutonomous => OdeSystem::autonomous(&["x"], &["-x^2"]),
-            _ => OdeSystem::new("t", &["x"], &["-x^2"]),
+            _ => OdeSystem::general("t", &["x"], &["-x^2"]),
         }
         .unwrap();
         assert!(
@@ -213,7 +217,7 @@ fn callback_errors_propagate_from_each_solver_family() {
             Method::LawsonLinear => OdeSystem::linear("t", &["x"], &["0"], &["sqrt(-1)"]),
             Method::LawsonSplit => OdeSystem::split("t", &["x"], &[0.0], &["sqrt(-1)"]),
             Method::RosenbrockAutonomous => OdeSystem::autonomous(&["x"], &["sqrt(-1)"]),
-            _ => OdeSystem::new("t", &["x"], &["sqrt(-1)"]),
+            _ => OdeSystem::general("t", &["x"], &["sqrt(-1)"]),
         }
         .unwrap();
         assert!(
@@ -228,15 +232,15 @@ fn callback_errors_propagate_from_each_solver_family() {
 
 #[test]
 fn rejects_invalid_system_forms_and_incompatible_methods() {
-    assert!(OdeSystem::new("t", &["NaN"], &["NaN"]).is_err());
+    assert!(OdeSystem::general("t", &["NaN"], &["NaN"]).is_err());
     assert!(OdeSystem::autonomous(&["x"], &["t+x"]).is_err());
     assert!(OdeSystem::linear("t", &["x"], &["x"], &["0"]).is_err());
     assert!(OdeSystem::linear("t", &["x"], &["1"], &["x"]).is_err());
     assert!(OdeSystem::split("t", &["x"], &[f64::NAN], &["0"]).is_err());
     assert!(OdeSystem::linear("t", &["x", "y"], &["1"], &["0", "0"]).is_err());
-    assert!(OdeSystem::new("t", &["x", "x"], &["0", "0"]).is_err());
-    assert!(OdeSystem::new("x", &["x"], &["0"]).is_err());
-    let general = OdeSystem::new("t", &["x"], &["x"]).unwrap();
+    assert!(OdeSystem::general("t", &["x", "x"], &["0", "0"]).is_err());
+    assert!(OdeSystem::general("x", &["x"], &["0"]).is_err());
+    let general = OdeSystem::general("t", &["x"], &["x"]).unwrap();
     for method in [
         Method::LawsonLinear,
         Method::LawsonSplit,
@@ -296,7 +300,7 @@ fn larger_systems_exercise_quadratic_workspaces() {
         .collect();
     let names: Vec<_> = names.iter().map(String::as_str).collect();
     let rhs: Vec<_> = rhs.iter().map(String::as_str).collect();
-    let general = OdeSystem::new("t", &names, &rhs).unwrap();
+    let general = OdeSystem::general("t", &names, &rhs).unwrap();
     let autonomous = OdeSystem::autonomous(&names, &rhs).unwrap();
     let mut matrix = vec![0.0; 144];
     for i in 0..12 {

@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: BSL-1.0
+// Distributed under the Boost Software License, Version 1.0.
+// See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
 use cauchy_ode::{Solver, SolverError};
 
 fn assert_close(actual: f64, expected: f64, tolerance: f64) {

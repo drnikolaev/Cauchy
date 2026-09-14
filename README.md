@@ -1,7 +1,12 @@
 # cauchy-ode
 
-Express equations naturally in Rust. Solve them with classic numerical methods
-implemented in Fortran.
+Distributed under the [Boost Software License, Version 1.0](LICENSE).
+
+Write equations naturally in Rust, with symbolic Jacobians and adaptive stiff solvers.
+
+![Aizawa attractor trajectory](Aizawa.png)
+
+*Aizawa attractor computed by cauchy-ode*
 
 `cauchy-ode` numerically solves **Cauchy's initial value problem** for ordinary
 differential equations and systems: find a trajectory `x(t)` satisfying
@@ -13,120 +18,14 @@ for the mathematical formulation.
 The Cargo package is named `cauchy-ode`. Rust identifiers cannot contain dashes,
 so Cargo exposes the library as `cauchy_ode`: imports use `use cauchy_ode::...`.
 
-![Aizawa attractor trajectory](Aizawa.png)
-
-*Aizawa attractor computed by cauchy-ode*
-
 `Solver` integrates expressions with the adaptive England, Lawson, and
 Rosenbrock methods. Build with Cargo and a Fortran compiler: Intel `ifx` on
 Windows, or `gfortran` on Linux/macOS. Linking uses Intel oneMKL on Windows,
-Accelerate on macOS, and BLAS/LAPACK on Linux. See [Building](#building).
+Accelerate on macOS, and BLAS/LAPACK on Linux. See [Building](BUILDING.md).
 
 ## Building
 
-### Windows (Intel Fortran)
-
-Install the following x64 tools:
-
-- Current stable Rust with the `x86_64-pc-windows-msvc` toolchain.
-- Visual Studio 2022 or Build Tools with **Desktop development with C++**,
-  including the MSVC x64 tools and a Windows SDK.
-- Intel oneAPI **Fortran Compiler** (`ifx`) and **oneMKL** development libraries.
-
-From PowerShell, Command Prompt, or an IDE terminal in the repository, use Cargo
-directly:
-
-```powershell
-cargo build --release
-cargo test
-cargo run --release --example lorenz
-```
-
-The build script runs Intel's `setvars.bat` in a child process to find `ifx`,
-the MSVC librarian, and the Intel runtime and oneMKL libraries. It passes the
-detected library directories to Rust's linker, so `LIB` and `MKLROOT` need not
-already be set in your terminal. This does not change your shell environment.
-It uses `%ProgramFiles(x86)%\Intel\oneAPI` by default. Set `ONEAPI_ROOT` to the
-oneAPI installation directory if installed elsewhere; an explicit `MKLROOT`
-selects a different oneMKL installation.
-
-The Intel compiler and oneMKL **runtime DLL directories** must still be on
-`PATH` to run the built executables (normally `compiler\latest\bin` and
-`mkl\latest\bin` under the oneAPI installation). If they are not on `PATH`,
-the helper sets up the environment for both building and running:
-
-```powershell
-.\scripts\cargo-intel.cmd run --release --example lorenz
-.\scripts\cargo-intel.cmd test
-```
-
-Alternatively, open an **Intel oneAPI command prompt for Intel 64** and run
-Cargo directly. To initialize an ordinary **Command Prompt** manually:
-
-```bat
-call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64
-cargo build --release
-cargo test
-```
-
-Windows builds default to `FC=ifx` and `AR=lib.exe`. `FC` may also name Intel
-`ifort` or the full path to an Intel compiler; `AR` must use the MSVC librarian
-command syntax. These variables name executables, without extra flags.
-The supported Windows target is `x86_64-pc-windows-msvc`.
-
-The build links the sequential LP64 oneMKL libraries, matching the Fortran
-32-bit integer ABI and allowing concurrent Rust solves without MKL thread
-pools. When distributing an executable, include the corresponding Intel
-Fortran and oneMKL redistributable runtimes.
-
-### Ubuntu Linux (ARM64 / aarch64)
-
-The project builds and runs natively on Ubuntu 24.04 LTS ARM64 with GNU
-Fortran and Ubuntu's BLAS/LAPACK libraries. Use current stable Rust from
-[rustup](https://rustup.rs/) (the crate uses Rust edition 2024). On an ARM64
-Ubuntu installation, rustup selects `aarch64-unknown-linux-gnu` automatically.
-
-Install the native build dependencies, then build and test from the repository:
-
-```bash
-sudo apt update
-sudo apt install build-essential gfortran libblas-dev liblapack-dev
-cargo build --locked --release --all-targets
-cargo test --locked
-cargo test --locked --release
-```
-
-Run the console example or generate an interactive attractor viewer:
-
-```bash
-cargo run --locked --release --example hello_world
-cargo run --locked --release --example lorenz -- --no-open
-```
-
-The second command writes `target/lorenz.html`, which you can open in a web
-browser. On Ubuntu Desktop, omit `--no-open` to launch the browser through
-`xdg-open` (provided by `xdg-utils`). Use `--no-open` on servers or over SSH.
-This package is a library with runnable examples; select an example with
-`--example` when using `cargo run`.
-
-The build uses `gfortran` and `ar` from `PATH`. Set `FC` or `AR` to override
-these executables; their values must be executable names or paths without
-extra flags. Use the standard BLAS/LAPACK packages above, which have 32-bit
-Fortran integers matching the Rust FFI even on ARM64. If copying executables
-to another compatible Ubuntu ARM64 machine, install the runtime packages
-`libgfortran5 libblas3 liblapack3` there as well.
-
-The [Ubuntu ARM64 workflow](.github/workflows/ubuntu-arm64.yml) builds all
-targets, runs debug and release tests, and runs all five examples on a native
-`ubuntu-24.04-arm` runner. This covers 64-bit ARM; 32-bit ARM is not verified.
-
-### Other Linux distributions and macOS (GNU Fortran)
-
-Install `gfortran`, a C linker and archiver, and, on Linux, BLAS/LAPACK
-development libraries using your distribution's package manager. On macOS,
-install GCC with `brew install gcc`; Accelerate is supplied by macOS.
-Then run `cargo build --release` and `cargo test`. Set `FC` if the GNU Fortran
-executable has a versioned name or a custom path, and `AR` to override `ar`.
+See [Building instructions](BUILDING.md) for Windows, Linux, and macOS setup.
 
 ## Library usage
 
@@ -164,9 +63,39 @@ Choose an algorithm with the `method` field.
 England remains the default. 
 **For stiff systems Rosenbrock is recommended.**
 
-The system types are: Type 1 — general systems; Type 2 —
-autonomous systems; Type 3 — linear systems; Type 4 — systems with a constant
-linear part and a nonlinear remainder (relatively small one expected).
+The four system types below share the initial condition $x(t_0) = x_0$,
+where $x(t) \in \mathbb{R}^n$ is the state vector.
+
+**Type 1 — General systems** (`OdeSystem::general`):
+
+$$
+\frac{dx}{dt} = f(t, x).
+$$
+
+**Type 2 — Autonomous systems** (`OdeSystem::autonomous`), with no explicit
+dependence on time:
+
+$$
+\frac{dx}{dt} = f(x).
+$$
+
+**Type 3 — Linear systems** (`OdeSystem::linear`):
+
+$$
+\frac{dx}{dt} = A(t)x + \varphi(t).
+$$
+
+Here $A(t)$ is an $n \times n$ matrix and $\varphi(t)$ is a forcing vector;
+both depend only on time.
+
+**Type 4 — Systems with a constant linear part** (`OdeSystem::split`):
+
+$$
+\frac{dx}{dt} = Bx + u(t, x).
+$$
+
+Here $B$ is a constant $n \times n$ matrix and $u(t, x)$ is a nonlinear
+remainder, expected to be relatively small.
 
 - **England:** Runge–Kutta process modification developed by R. England. A fast
   and precise fifth-order method suitable for solving systems of Type 1.
@@ -195,7 +124,7 @@ For custom variable names and reusable parsed systems:
 use cauchy_ode::{Method, OdeSystem, Solver};
 
 fn main() {
-    let system = OdeSystem::new("time", &["position", "velocity"], &[
+    let system = OdeSystem::general("time", &["position", "velocity"], &[
         "velocity", "-position - 0.1*velocity + sin(time)",
     ]).unwrap();
     let solver = Solver { method: Method::Rosenbrock, ..Solver::default() };
@@ -203,6 +132,9 @@ fn main() {
     println!("Final state: {:?}", solution.states.last().unwrap());
 }
 ```
+
+`OdeSystem::new` and `OdeSystem::new_with_parameters` remain available as
+compatibility aliases for `general` and `general_with_parameters`.
 
 `OdeSystem::autonomous(&["x", "y"], &["y", "-x"])` declares a time-independent
 system. For the convenience `solve` and `solve_system` methods, selecting
@@ -225,7 +157,7 @@ and symbolic differentiation:
 use cauchy_ode::{OdeSystem, Solver};
 
 fn main() {
-    let system = OdeSystem::new_with_parameters(
+    let system = OdeSystem::general_with_parameters(
         "clock",
         &["position", "velocity"],
         &["velocity", "-stiffness*position-damping*velocity+sin(clock)"],
@@ -245,7 +177,7 @@ systems. Substitution operates on expression trees, not text, and does not alter
 longer names or function calls. Values are copied into the system: rebuild it
 with new bindings to change parameters.
 
-The four constructors are `new_with_parameters`, `autonomous_with_parameters`,
+The four constructors are `general_with_parameters`, `autonomous_with_parameters`,
 `linear_with_parameters`, and `split_with_parameters`; the existing constructors
 remain available without bindings. Linear bindings apply to both the matrix and
 forcing. The parameterized split constructor takes **matrix expression strings**
@@ -297,7 +229,7 @@ All matrices, including Jacobian callbacks, use Fortran column-major order:
 index `column * dimension + row`. The supplied `SLOUI` implements `phi(t)`,
 whereas [the old manual's Type 3 formula](https://cvmlib.com/runge/help_en/index_ense1.html#x2-40001.3)
 shows `phi(x)` - that is a typo actually. State-dependent forcing is rejected by `linear`; represent that
-case with the complete RHS in `OdeSystem::new` and select general Lawson.
+case with the complete RHS in `OdeSystem::general` and select general Lawson.
 
 The result contains the initial point and every accepted adaptive step in
 `times` and `states`, including the requested endpoint. `recommended_steps`
@@ -360,127 +292,6 @@ statuses -1000 and -2000 indicate allocation and non-finite inverse data errors.
 These statuses are preserved in `SolverError::FortranFailure`, including a
 singular Rosenbrock stage matrix, rather than being overwritten with 65.
 
-## Hello, world: a two-variable system
-
-The minimal console demo in [`examples/hello_world.rs`](examples/hello_world.rs)
-computes `x' = cos(y), y' = sin(x)` from `(0, 0)` over `t = 0..10`:
-
-```bash
-cargo run --example hello_world
-```
-
-The complete app is:
-
-```rust
-use cauchy_ode::{OdeSystem, Solver};
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let system = OdeSystem::autonomous(&["x", "y"], &["cos(y)", "sin(x)"])?;
-    // Start at (x, y) = (0, 0) and integrate from t = 0 to t = 10.
-    let trajectory = Solver::default().solve_problem(&system, 0.0, &[0.0, 0.0], 10.0)?;
-
-    println!("t,x,y");
-    for (t, state) in trajectory.times.iter().zip(&trajectory.states) {
-        println!("{t:.6},{:.6},{:.6}", state[0], state[1]);
-    }
-    Ok(())
-}
-```
-
-This is a pair of coupled first-order ODEs with a two-dimensional state.
-`autonomous` means the equations do not explicitly depend on time. The default
-solver is England; the output contains the initial point and every accepted
-adaptive step, including the endpoint, as `t,x,y` rows. No plotting code or
-additional dependencies are needed. Building requires a Fortran compiler as
-described under [Building](#building).
-
-## Lorenz butterfly demo
-
-```sh
-cargo run --release --example lorenz
-```
-
-Computes the classic Lorenz system from `(1, 1, 1)` and opens an interactive,
-offline viewer at `target/lorenz.html`. Drag to rotate, scroll to zoom, switch
-coordinate projections, replay or scrub the trajectory, and export PNG or CSV.
-The Rust example computes every point with cauchy-ode; the viewer renders those
-points and requires no external JavaScript libraries or network access.
-
-```sh
-cargo run --release --example lorenz -- --method rosenbrock-autonomous --duration 80
-cargo run --release --example lorenz -- --no-open --output target/butterfly.html
-```
-
-Supported demo methods: `england` (default), `lawson`, `rosenbrock`, and
-`rosenbrock-autonomous`. Different numerical methods can produce different
-long-term trajectories in this chaotic system. The plot hides an initial
-transient by default; uncheck **Hide transient** to display the complete path.
-
-## Rössler ribbon demo
-
-```sh
-cargo run --release --example rossler
-```
-
-Solves `x' = -y-z`, `y' = x+0.2*y`, `z' = 0.2+z*(x-5.7)` from `(1, 1, 1)`
-over 300 time units and opens `target/rossler.html`. The initial 50 time units
-are hidden by default to show the developed attractor. Its camera and scale
-are set to reveal the spiral and its rising fold.
-
-The Rössler and Lorenz demos share the same offline viewer, with 3D rotation,
-coordinate projections, playback, zoom, and PNG/CSV export. The same options
-are available for both:
-
-```sh
-cargo run --release --example rossler -- --method rosenbrock-autonomous --duration 400
-cargo run --release --example rossler -- --no-open --output target/ribbon.html
-```
-
-## Thomas labyrinth demo
-
-```sh
-cargo run --release --example thomas
-```
-
-Solves `x' = sin(y)-0.208*x`, `y' = sin(z)-0.208*y`, and
-`z' = sin(x)-0.208*z` for 500 time units and opens `target/thomas.html`.
-The initial state `(1, 0, 0)` breaks the symmetry: equal initial coordinates
-would stay on the diagonal `x=y=z`. The viewer hides the first 100 time units
-by default and uses a centered 3D view with a color scale spanning negative
-and positive z. Rotation, projections, replay, and PNG/CSV export work as in
-the other demos.
-
-```sh
-cargo run --release --example thomas -- --method rosenbrock-autonomous
-cargo run --release --example thomas -- --no-open --output target/labyrinth.html
-```
-
-## Aizawa vortex demo
-
-```bash
-cargo run --release --example aizawa
-```
-
-Integrates the following system from `(0.1, 0, 0)` for 300 time units and opens
-`target/aizawa.html` in the shared offline, interactive 3D viewer:
-
-```text
-x' = (z - 0.7)x - 3.5y
-y' = 3.5x + (z - 0.7)y
-z' = 0.6 + 0.95z - z³/3 - (x² + y²)(1 + 0.25z) + 0.1zx³
-```
-
-Equations and parameters follow the
-[Chaotic Motion reference implementation](https://nbodyphysics.com/chaoticmotion/html/_aizawa_8cs_source.html).
-The sidebar uses the equivalent parameterized form, with all six constants shown.
-The viewer hides the first 20 time units by default; uncheck “Hide transient” to
-see the initial approach. Rotation, replay, projections, PNG and CSV exports are
-available, just as in the other demos.
-
-```bash
-cargo run --release --example aizawa -- --method rosenbrock-autonomous --duration 150
-cargo run --release --example aizawa -- --no-open --output target/aizawa.html
-```
 
 ## Stiff system regression tests
 

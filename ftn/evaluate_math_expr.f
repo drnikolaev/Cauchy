@@ -1,3 +1,7 @@
+C SPDX-License-Identifier: BSL-1.0
+C Distributed under the Boost Software License, Version 1.0.
+C See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
       SUBROUTINE CAUCHY_ODE_FORTRAN_EVALUATE(SOURCE, SOURCE_LEN,
      &     X, X_LEN, ANSWER, INFO) BIND(C,
      &     NAME="cauchy_ode_fortran_evaluate_math_expr")

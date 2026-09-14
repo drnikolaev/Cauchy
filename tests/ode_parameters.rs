@@ -1,10 +1,14 @@
+// SPDX-License-Identifier: BSL-1.0
+// Distributed under the Boost Software License, Version 1.0.
+// See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
 use cauchy_ode::{MathExpr, Method, OdeSystem, Solver, SolverError};
 use std::collections::HashMap;
 
 #[test]
 fn named_parameter_decay_example() -> Result<(), SolverError> {
     // Bind rate once: position' = -2 * position, with time named clock.
-    let system = OdeSystem::new_with_parameters(
+    let system = OdeSystem::general_with_parameters(
         "clock",
         &["position"],
         &["-rate*position"],
@@ -63,7 +67,7 @@ fn integrate(
 #[test]
 fn explicit_systems_do_not_alias_undeclared_x() {
     for result in [
-        OdeSystem::new("clock", &["x0"], &["x"]),
+        OdeSystem::general("clock", &["x0"], &["x"]),
         OdeSystem::autonomous(&["x0"], &["x"]),
         OdeSystem::linear("clock", &["x0"], &["0"], &["x"]),
         OdeSystem::split("clock", &["x0"], &[0.0], &["x"]),
@@ -77,7 +81,7 @@ fn explicit_systems_do_not_alias_undeclared_x() {
 
 #[test]
 fn time_can_be_named_x_without_becoming_a_state_alias() {
-    let system = OdeSystem::new("x", &["x0"], &["2*x"]).unwrap();
+    let system = OdeSystem::general("x", &["x0"], &["2*x"]).unwrap();
     for method in [Method::England, Method::Lawson, Method::Rosenbrock] {
         integrate(method, &system, &[0.0], |t| vec![t * t]);
     }
@@ -85,7 +89,7 @@ fn time_can_be_named_x_without_becoming_a_state_alias() {
 
 #[test]
 fn t_can_be_a_state_when_time_has_another_name() {
-    let system = OdeSystem::new("clock", &["t", "velocity"], &["velocity", "-t"]).unwrap();
+    let system = OdeSystem::general("clock", &["t", "velocity"], &["velocity", "-t"]).unwrap();
     for method in [Method::England, Method::Lawson, Method::Rosenbrock] {
         integrate(method, &system, &[1.0, 0.0], |t| vec![t.cos(), -t.sin()]);
     }
@@ -122,7 +126,7 @@ fn convenience_scalar_aliases_still_share_one_derivative() {
 
 #[test]
 fn general_parameters_are_bound_before_state_and_time_derivatives() {
-    let system = OdeSystem::new_with_parameters(
+    let system = OdeSystem::general_with_parameters(
         "clock",
         &["position"],
         &["-rate*(position-clock^2)+2*clock"],
@@ -145,7 +149,7 @@ fn general_parameters_are_bound_before_state_and_time_derivatives() {
 #[test]
 fn x_can_be_an_explicit_parameter_for_state_x0() {
     let system =
-        OdeSystem::new_with_parameters("clock", &["x0"], &["-x*x0"], &[("x", 2.0)]).unwrap();
+        OdeSystem::general_with_parameters("clock", &["x0"], &["-x*x0"], &[("x", 2.0)]).unwrap();
     assert_eq!(
         system.expressions()[0].derive("x0").simplify(),
         MathExpr::new_const(-2.0)
@@ -258,7 +262,7 @@ fn rejects_invalid_duplicate_colliding_and_nonfinite_bindings() {
     ] {
         assert!(
             matches!(
-                OdeSystem::new_with_parameters("clock", &["q"], &["q"], &bindings),
+                OdeSystem::general_with_parameters("clock", &["q"], &["q"], &bindings),
                 Err(SolverError::InvalidInput(_))
             ),
             "{bindings:?}"
@@ -269,7 +273,7 @@ fn rejects_invalid_duplicate_colliding_and_nonfinite_bindings() {
 #[test]
 fn every_constructor_rejects_missing_bindings() {
     for result in [
-        OdeSystem::new_with_parameters("clock", &["q"], &["missing*q"], &[]),
+        OdeSystem::general_with_parameters("clock", &["q"], &["missing*q"], &[]),
         OdeSystem::autonomous_with_parameters(&["q"], &["missing*q"], &[]),
         OdeSystem::linear_with_parameters("clock", &["q"], &["missing"], &["0"], &[]),
         OdeSystem::linear_with_parameters("clock", &["q"], &["0"], &["missing"], &[]),

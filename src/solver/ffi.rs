@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: BSL-1.0
+// Distributed under the Boost Software License, Version 1.0.
+// See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
+
 //! Private, synchronous bridge to the Fortran step routines.
 use super::{CallbackContext, CallbackKind, Method, Solver, SolverError};
 use std::ffi::{c_double, c_int, c_void};

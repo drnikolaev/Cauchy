@@ -1,0 +1,50 @@
+name: Ubuntu x86_64
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gfortran libblas-dev liblapack-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify native x86_64 toolchain
+        run: |
+          test "$(uname -m)" = x86_64
+          rustc -vV
+          gfortran --version
+      - name: Build all targets
+        run: cargo build --locked --release --all-targets
+      - name: Test debug and release builds
+        run: |
+          cargo test --locked
+          cargo test --locked --release
+      - name: Run examples
+        run: |
+          cargo run --locked --release --example hello_world
+          for demo in lorenz rossler thomas aizawa halvorsen four_wing dadras; do
+            cargo run --locked --release --example "$demo" -- --no-open
+            test -s "target/$demo.html"
+          done
+          cargo run --locked --release --example precision -- --no-open
+          test -s target/precision/index.html
+          test -s target/precision/errors.csv
+      - name: Upload example reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-x86_64-examples
+          path: |
+            target/*.html
+            target/precision/
+          if-no-files-found: error

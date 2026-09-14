@@ -2,7 +2,7 @@
 
 [Back to README](README.md)
 
-## Windows (Intel Fortran)
+## Windows (Intel Fortran, MKL)
 
 Install the following x64 tools:
 
@@ -57,12 +57,15 @@ The build links the sequential LP64 oneMKL libraries, matching the Fortran
 pools. When distributing an executable, include the corresponding Intel
 Fortran and oneMKL redistributable runtimes.
 
-## Ubuntu Linux (ARM64 / aarch64)
+## Ubuntu Linux (Intel x86_64, AMD x86_64 and ARM64)
 
-The project builds and runs natively on Ubuntu 24.04 LTS ARM64 with GNU
-Fortran and Ubuntu's BLAS/LAPACK libraries. Use current stable Rust from
-[rustup](https://rustup.rs/) (the crate uses Rust edition 2024). On an ARM64
-Ubuntu installation, rustup selects `aarch64-unknown-linux-gnu` automatically.
+The project supports native Ubuntu 24.04 LTS builds on Intel/AMD x86_64
+(`amd64` packages) and ARM64 with GNU Fortran and Ubuntu's BLAS/LAPACK
+libraries. Intel CPUs do not require Intel oneAPI or MKL on Linux. 
+Although, this might be good idea to use them too. Use current
+stable Rust from [rustup](https://rustup.rs/) (the crate uses Rust edition 2024).
+Rustup selects `x86_64-unknown-linux-gnu` on Intel/AMD machines and
+`aarch64-unknown-linux-gnu` on ARM64 automatically.
 
 Install the native build dependencies, then build and test from the repository:
 
@@ -90,9 +93,15 @@ This package is a library with runnable examples; select an example with
 The build uses `gfortran` and `ar` from `PATH`. Set `FC` or `AR` to override
 these executables; their values must be executable names or paths without
 extra flags. Use the standard BLAS/LAPACK packages above, which have 32-bit
-Fortran integers matching the Rust FFI even on ARM64. If copying executables
-to another compatible Ubuntu ARM64 machine, install the runtime packages
+Fortran integers matching the Rust FFI on both architectures. If copying executables
+to another compatible Ubuntu machine of the same architecture, install the runtime packages
 `libgfortran5 libblas3 liblapack3` there as well.
+
+The [Ubuntu x86_64 workflow](.github/workflows/ubuntu-x86_64.yml) builds all
+targets, runs debug and release tests, and runs every example, including the
+precision report, on `ubuntu-24.04`. Generated HTML reports and precision CSV/SVG
+files are available in the workflow artifacts. Hosted x86_64 runners may use
+Intel or AMD CPUs; the workflow checks the architecture, not the CPU vendor.
 
 The [Ubuntu ARM64 workflow](.github/workflows/ubuntu-arm64.yml) builds all
 targets, runs debug and release tests, and runs the console and seven attractor examples on a native

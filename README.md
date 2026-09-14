@@ -13,9 +13,9 @@ Write equations naturally in Rust, with symbolic Jacobians and adaptive stiff so
 *Aizawa attractor computed by cauchy-ode*
 
 `cauchy-ode` numerically solves **Cauchy's initial value problem** for ordinary
-differential equations and systems: find a trajectory `x(t)` satisfying
-`x'(t) = f(t, x(t))` with the prescribed initial condition `x(t0) = x0`.
-Here `x` may be a scalar or a vector of state variables. See Wikipedia's
+differential equations and systems: find a trajectory $x(t)$ satisfying
+$x'(t) = f(t, x(t))$ with the prescribed initial condition $x(t_0) = x_0$.
+Here $x$ may be a scalar or a vector of state variables. See Wikipedia's
 [Initial value problem](https://en.wikipedia.org/wiki/Initial_value_problem)
 for the mathematical formulation.
 
@@ -100,6 +100,8 @@ $$
 
 Here $B$ is a constant $n \times n$ matrix and $u(t, x)$ is a nonlinear
 remainder, expected to be relatively small.
+
+**Methods shipped with the library:**
 
 - **England:** Runge–Kutta process modification developed by R. England. A fast
   and precise fifth-order method suitable for solving systems of Type 1.

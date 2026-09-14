@@ -104,7 +104,8 @@ files are available in the workflow artifacts. Hosted x86_64 runners may use
 Intel or AMD CPUs; the workflow checks the architecture, not the CPU vendor.
 
 The [Ubuntu ARM64 workflow](.github/workflows/ubuntu-arm64.yml) builds all
-targets, runs debug and release tests, and runs the console and seven attractor examples on a native
+targets, runs debug and release tests, and runs every example, including the
+precision report, on a native
 `ubuntu-24.04-arm` runner. This covers 64-bit ARM; 32-bit ARM is not verified.
 
 ## Other Linux distributions and macOS (GNU Fortran)
@@ -114,3 +115,39 @@ development libraries using your distribution's package manager. On macOS,
 install GCC with `brew install gcc`; Accelerate is supplied by macOS.
 Then run `cargo build --release` and `cargo test`. Set `FC` if the GNU Fortran
 executable has a versioned name or a custom path, and `AR` to override `ar`.
+
+## GitHub continuous integration
+
+GitHub Actions runs the following checks on every push and pull request:
+
+| Workflow | Checks |
+| --- | --- |
+| [Rust quality](.github/workflows/quality.yml) | Rustfmt and Clippy across all targets, with warnings treated as errors |
+| [Ubuntu x86_64](.github/workflows/ubuntu-x86_64.yml) | Release build of all targets, debug/release tests, and all nine examples |
+| [Ubuntu ARM64](.github/workflows/ubuntu-arm64.yml) | The same build, tests, and examples on native ARM64 |
+
+All workflows use stable Rust and install the native GNU Fortran and BLAS/LAPACK
+build dependencies. Superseded runs on the same branch are cancelled. Both
+Ubuntu workflows upload HTML viewers and the precision report (including SVG
+plots and CSV data) as `ubuntu-<architecture>-examples` artifacts.
+
+After pushing these files to GitHub, view results under the repository's
+**Actions** tab or the checks on a pull request. Each workflow also supports
+**Run workflow** from the Actions tab once it is on the default branch.
+No repository secrets are required. To enforce successful CI before merging,
+configure a branch ruleset requiring `quality`,
+`Ubuntu x86_64 build, test, and examples`, and
+`Ubuntu arm64 build, test, and examples`.
+
+Run the quality checks locally with:
+
+```bash
+rustup component add rustfmt clippy
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets -- -D warnings
+```
+
+The build and test commands above reproduce the Ubuntu CI checks; the complete
+example loop is in [EXAMPLES.md](EXAMPLES.md). Windows/Intel oneAPI and macOS
+build instructions are provided, but these platforms are not covered by the
+current GitHub workflows.

@@ -1,5 +1,9 @@
 # cauchy-ode
 
+[![Rust quality](https://github.com/drnikolaev/Cauchy/actions/workflows/quality.yml/badge.svg)](https://github.com/drnikolaev/Cauchy/actions/workflows/quality.yml)
+[![Ubuntu x86_64](https://github.com/drnikolaev/Cauchy/actions/workflows/ubuntu-x86_64.yml/badge.svg)](https://github.com/drnikolaev/Cauchy/actions/workflows/ubuntu-x86_64.yml)
+[![Ubuntu ARM64](https://github.com/drnikolaev/Cauchy/actions/workflows/ubuntu-arm64.yml/badge.svg)](https://github.com/drnikolaev/Cauchy/actions/workflows/ubuntu-arm64.yml)
+
 Distributed under the [Boost Software License, Version 1.0](LICENSE).
 
 Write equations naturally in Rust, with symbolic Jacobians and adaptive stiff solvers.

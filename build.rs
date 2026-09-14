@@ -86,7 +86,9 @@ fn intel_environment() -> HashMap<String, OsString> {
         );
         let wide: Vec<_> = output
             .stdout
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
             .collect();
         for line in String::from_utf16_lossy(&wide).lines() {

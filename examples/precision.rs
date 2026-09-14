@@ -27,7 +27,11 @@ const COLORS: [&str; 6] = [
 fn exact(kind: usize, i: usize, t: f64) -> f64 {
     if kind == 2 {
         let angle = (0.2 + 0.04 * (i / 2) as f64) * t;
-        if i % 2 == 0 { angle.cos() } else { angle.sin() }
+        if i.is_multiple_of(2) {
+            angle.cos()
+        } else {
+            angle.sin()
+        }
     } else {
         2.0 + ((0.2 + 0.02 * i as f64) * t).sin()
     }
@@ -176,7 +180,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let a = i / 2 * 2;
                     let b = a + 1;
                     let omega = 0.2 + 0.04 * (i / 2) as f64;
-                    let rotation = if i % 2 == 0 {
+                    let rotation = if i.is_multiple_of(2) {
                         format!("-{omega}*x{b}")
                     } else {
                         format!("{omega}*x{a}")

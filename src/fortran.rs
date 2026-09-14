@@ -112,7 +112,6 @@ impl Display for MatrixInverseError {
 
 impl std::error::Error for MatrixInverseError {}
 
-
 /// Sends an expression through Fortran and back to Rust for evaluation.
 /// Variables `x0`, `x1`, ... address vector components; a single component
 /// can also be referred to as `x`.
@@ -239,13 +238,11 @@ pub fn matrix_inverse(matrix: &[f64], order: usize) -> Result<Vec<f64>, MatrixIn
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        MatrixInverseError, evaluate_math_expr_from_fortran, matrix_exp, matrix_inverse,
-    };
-    
+    use super::{MatrixInverseError, evaluate_math_expr_from_fortran, matrix_exp, matrix_inverse};
+
     #[test]
     fn fortran_calls_rust_math_expr_evaluate() {
-        let answer = evaluate_math_expr_from_fortran("2 + 3 * 5",&[5.0]).unwrap();
+        let answer = evaluate_math_expr_from_fortran("2 + 3 * 5", &[5.0]).unwrap();
 
         assert_eq!(answer, 17.0);
     }

@@ -8,8 +8,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-run:
+    name: Ubuntu x86_64 build, test, and examples
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

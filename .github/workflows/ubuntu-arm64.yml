@@ -8,8 +8,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-run:
+    name: Ubuntu arm64 build, test, and examples
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
     steps:
@@ -37,3 +42,14 @@ jobs:
             cargo run --locked --release --example "$demo" -- --no-open
             test -s "target/$demo.html"
           done
+          cargo run --locked --release --example precision -- --no-open
+          test -s target/precision/index.html
+          test -s target/precision/errors.csv
+      - name: Upload example reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-arm64-examples
+          path: |
+            target/*.html
+            target/precision/
+          if-no-files-found: error

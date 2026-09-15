@@ -202,7 +202,7 @@ After substitution, its matrix must evaluate to finite constants; the remainder
 may still depend on time and state. Parameters are numeric constants, not
 runtime variables or expressions depending on other parameters.
 
-For `x' = A(t)x + phi(t)`, supply matrix entries and forcing as expressions:
+For $\ x' = A(t)x + \varphi(t)$, supply matrix entries and forcing as expressions:
 
 ```rust
 use cauchy_ode::{Method, OdeSystem, Solver};
@@ -217,7 +217,7 @@ fn main() {
 }
 ```
 
-For `x' = Bx + u(t,x)`, supply constant matrix entries and remainder expressions:
+For $\ x' = Bx + u(t,x)$, supply constant matrix entries and remainder expressions:
 
 ```rust
 use cauchy_ode::{Method, OdeSystem, Solver};
@@ -232,13 +232,13 @@ fn main() {
 ```
 
 All matrices, including Jacobian callbacks, use Fortran column-major order:
-index `column * dimension + row`. The supplied `SLOUI` implements `phi(t)`,
+index `column * dimension + row`. The supplied `SLOUI` implements $\varphi(t)$,
 whereas [the old manual's Type 3 formula](https://cvmlib.com/runge/help_en/index_ense1.html#x2-40001.3)
-shows `phi(x)` - that is a typo actually. State-dependent forcing is rejected by `linear`; represent that
+shows $\varphi(x)$ - that is a typo actually. State-dependent forcing is rejected by `linear`; represent that
 case with the complete RHS in `OdeSystem::general` and select general Lawson.
 
-The result contains the initial point and every accepted adaptive step in
-`times` and `states`, including the requested endpoint. `recommended_steps`
+The result contains the initial point and every accepted adaptive step in `times` and `states`,
+including the requested endpoint. `recommended_steps`
 stores the signed initial step and the recommended next step after each accepted
 step, matching the old product's solution table. Actual step lengths are the
 differences between successive times. Earlier end times integrate backward.
@@ -250,15 +250,15 @@ criterion, not a bound on global error. The final step may be shorter than
 ## Runge's principle (step doubling).
 
 Starting from the same numerical state at
-time `t`, compute `x1` with one step of length `h` and `x2` with two consecutive
-steps of length `h/2`, both ending at `t+h`. For a method of order `p`, the
-leading local errors are proportional to `h^(p+1)` and
-`2*(h/2)^(p+1) = h^(p+1)/2^p`, respectively. Eliminating the unknown leading
+time $t$, compute $x_1$ with one step of length $h$ and $x_2$ with two consecutive
+steps of length $h/2$, both ending at $t+h$. For a method of order $p$, the
+leading local errors are proportional to $h^{(p+1)}$ and
+$2(h/2)^{p+1} = h^{p+1}/2^p$, respectively. Eliminating the unknown leading
 coefficient gives the local error estimate for the **two-half-step result**:
-`E ≈ ||x2-x1||∞/(2^p-1)`. For fifth-order step doubling, such as applying this
-principle to England's fifth-order method, the denominator is `2^5-1 = 31`;
+$E ≈ ||x_2-x_1||_∞/(2^p-1)$. For fifth-order step doubling, such as applying this
+principle to England's fifth-order method, the denominator is $2^5-1 = 31$;
 for a scalar equation, the norm reduces to absolute value. The corresponding
-estimate for the one-full-step result is `2^p*E`. This is an asymptotic estimate
+estimate for the one-full-step result is $2^p E$. This is an asymptotic estimate
 for sufficiently smooth solutions and sufficiently small steps, not a rigorous
 upper bound or a bound on accumulated global error. It supplies a discrepancy
 for adaptive step acceptance and rejection. See [[4]](#reference-4),

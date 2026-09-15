@@ -13,6 +13,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docs:
+    name: Documentation without native tools
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - name: Build documentation with docs.rs settings
+        env:
+          DOCS_RS: "1"
+          FC: /nonexistent/docs-rs-fortran
+          AR: /nonexistent/docs-rs-archiver
+          RUSTDOCFLAGS: --cfg docsrs -D warnings
+        run: cargo doc --locked --no-deps --lib --target x86_64-unknown-linux-gnu
+
   quality:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

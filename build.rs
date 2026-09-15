@@ -171,6 +171,13 @@ fn link_intel_runtime(environment: &HashMap<String, OsString>) {
 }
 
 fn main() {
+    // Rustdoc needs the Rust declarations, not the native implementations.
+    // Track this switch so a later ordinary build restores native linking.
+    println!("cargo:rerun-if-env-changed=DOCS_RS");
+    if env::var_os("DOCS_RS").is_some() {
+        return;
+    }
+
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("target OS must be set");
     let windows = target_os == "windows";
     if windows {

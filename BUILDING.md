@@ -122,12 +122,13 @@ GitHub Actions runs the following checks on every push and pull request:
 
 | Workflow | Checks |
 | --- | --- |
-| [Rust quality](.github/workflows/quality.yml) | Rustfmt and Clippy across all targets, with warnings treated as errors |
+| [Rust quality](.github/workflows/quality.yml) | Rustfmt and Clippy across all targets, plus a nightly documentation build with native tools disabled; warnings are errors |
 | [Ubuntu x86_64](.github/workflows/ubuntu-x86_64.yml) | Release build of all targets, debug/release tests, and all nine examples |
 | [Ubuntu ARM64](.github/workflows/ubuntu-arm64.yml) | The same build, tests, and examples on native ARM64 |
 
-All workflows use stable Rust and install the native GNU Fortran and BLAS/LAPACK
-build dependencies. Superseded runs on the same branch are cancelled. Both
+Build, test, and lint jobs use stable Rust and install the native GNU Fortran
+and BLAS/LAPACK dependencies. The documentation job uses nightly Rust without
+installing native dependencies. Superseded runs on the same branch are cancelled. Both
 Ubuntu workflows upload HTML viewers and the precision report (including SVG
 plots and CSV data) as `ubuntu-<architecture>-examples` artifacts.
 
@@ -151,3 +152,29 @@ The build and test commands above reproduce the Ubuntu CI checks; the complete
 example loop is in [EXAMPLES.md](EXAMPLES.md). Windows/Intel oneAPI and macOS
 build instructions are provided, but these platforms are not covered by the
 current GitHub workflows.
+
+## docs.rs documentation builds
+
+The build script recognizes the `DOCS_RS` environment variable supplied by
+[docs.rs](https://docs.rs/about/builds). When it is present, the script skips
+Fortran compilation, archiving, native library discovery, and linker directives.
+The complete Rust API remains available to rustdoc. Cargo metadata selects
+`x86_64-unknown-linux-gnu` as the sole hosted documentation target; this does
+not restrict the platforms supported by normal builds.
+
+The separate documentation CI job uses nightly Rust, matching docs.rs's
+toolchain channel, with deliberately nonexistent `FC` and `AR` paths. Reproduce
+the check on Linux with the target installed:
+
+```bash
+DOCS_RS=1 FC=/nonexistent/docs-rs-fortran AR=/nonexistent/docs-rs-archiver \
+  RUSTDOCFLAGS="--cfg docsrs -D warnings" \
+  cargo doc --locked --no-deps --lib --target x86_64-unknown-linux-gnu
+```
+
+For a local check on another platform, omit `--target` to use the host target.
+This checks the documentation-only path, not the complete hosted docs.rs
+sandbox. `DOCS_RS` is not a way to build or run the solver without its native
+libraries: leave it unset for `cargo build`, `cargo test` (including doctests),
+and examples. Changes to `DOCS_RS` cause Cargo to rerun the build script, so
+normal native compilation resumes after it is unset.

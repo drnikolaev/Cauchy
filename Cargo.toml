@@ -3,7 +3,16 @@ name = "cauchy-ode"
 version = "0.1.0"
 edition = "2024"
 license = "BSL-1.0"
-description = "Adaptive stiff and non-stiff ODE solvers with symbolic expressions, automatic Jacobians, and Fortran-backed algorithms"
+description = "Adaptive stiff and non-stiff ODE solvers with equations naturally written in Rust, symbolic Jacobians and Fortran-backed algorithms"
+repository = "https://github.com/drnikolaev/Cauchy"
+documentation = "https://docs.rs/cauchy-ode"
+readme = "README.md"
+keywords = ["ode", "numerical", "solver", "scientific", "fortran"]
+categories = ["science", "mathematics"]
 
 [dependencies]
 num-traits = "0.2"
+
+[package.metadata.docs.rs]
+default-target = "x86_64-unknown-linux-gnu"
+targets = []

@@ -36,11 +36,13 @@ Solve `x' = t + sqrt(x)` with `x(1) = 1` up to `t = 2`:
 
 ```rust
 use cauchy_ode::Solver;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let solution = Solver::default().solve("t+sqrt(x)", 1.0, 1.0, 2.0)?;
+    let final_x = solution.states.last().unwrap()[0];
+    assert!((final_x - 4.0).abs() < 1e-6);
+    Ok(())
+}
 
-let solution = Solver::default().solve("t+sqrt(x)", 1.0, 1.0, 2.0)?;
-let final_x = solution.states.last().unwrap()[0];
-assert!((final_x - 4.0).abs() < 1e-6);
-# Ok::<(), cauchy_ode::SolverError>(())
 ```
 
 [`Solver::solve`] accepts `t` and either `x` or `x0` for the scalar state.
@@ -49,14 +51,16 @@ assert!((final_x - 4.0).abs() < 1e-6);
 ```rust
 use cauchy_ode::Solver;
 
-let solution = Solver::default().solve_system(
-    &["x1", "-x0"],
-    0.0,
-    &[1.0, 0.0],
-    std::f64::consts::TAU,
-)?;
-assert!((solution.states.last().unwrap()[0] - 1.0).abs() < 1e-6);
-# Ok::<(), cauchy_ode::SolverError>(())
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let solution = Solver::default().solve_system(
+        &["x1", "-x0"],
+        0.0,
+        &[1.0, 0.0],
+        std::f64::consts::TAU,
+    )?;
+    assert!((solution.states.last().unwrap()[0] - 1.0).abs() < 1e-6);
+    Ok(())
+}
 ```
 
 ## Named variables, parameters, and stiff systems
@@ -68,17 +72,19 @@ decaying mode with rate 1000:
 ```rust
 use cauchy_ode::{Method, OdeSystem, Solver};
 
-let system = OdeSystem::general_with_parameters(
-    "t", &["x"], &["-rate*(x-cos(t))-sin(t)"], &[("rate", 1000.0)],
-)?;
-let solver = Solver {
-    method: Method::Rosenbrock,
-    tolerance: 1e-10,
-    ..Solver::default()
-};
-let solution = solver.solve_problem(&system, 0.0, &[1.0], 1.0)?;
-assert!((solution.states.last().unwrap()[0] - 1.0_f64.cos()).abs() < 1e-6);
-# Ok::<(), cauchy_ode::SolverError>(())
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let system = OdeSystem::general_with_parameters(
+        "t", &["x"], &["-rate*(x-cos(t))-sin(t)"], &[("rate", 1000.0)],
+    )?;
+    let solver = Solver {
+        method: Method::Rosenbrock,
+        tolerance: 1e-10,
+        ..Solver::default()
+    };
+    let solution = solver.solve_problem(&system, 0.0, &[1.0], 1.0)?;
+    assert!((solution.states.last().unwrap()[0] - 1.0_f64.cos()).abs() < 1e-6);
+    Ok(())
+}
 ```
 
 [`OdeSystem`] uses exactly the names you declare, with no implicit aliases.

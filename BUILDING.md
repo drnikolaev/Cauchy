@@ -155,6 +155,10 @@ current GitHub workflows.
 
 ## docs.rs documentation builds
 
+The crate landing page is maintained in [DOCS_RS.md](DOCS_RS.md), included by
+`src/lib.rs`. Its Rust examples are checked by `cargo test --doc` with native
+dependencies installed. Edit that file to update the docs.rs introduction.
+
 The build script recognizes the `DOCS_RS` environment variable supplied by
 [docs.rs](https://docs.rs/about/builds). When it is present, the script skips
 Fortran compilation, archiving, native library discovery, and linker directives.

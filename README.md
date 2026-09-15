@@ -31,6 +31,13 @@ Accelerate on macOS, and BLAS/LAPACK on Linux. See [Building](BUILDING.md).
 
 See [Building instructions](BUILDING.md) for Windows, Linux, and macOS setup.
 
+## Documentation
+
+- [MathExpr expressions](MATH_EXPR.md): supported operators, functions,
+  precedence, constants, conditional expressions, and symbolic derivatives.
+- [Examples](EXAMPLES.md): precision comparisons and interactive attractor demos.
+- [Building and CI](BUILDING.md): platform dependencies and verification commands.
+
 ## Library usage
 
 ```rust
@@ -47,6 +54,9 @@ fn main() {
 ```
 
 `solve(rhs, start_time, initial_x, end_time)` accepts `t` and `x` in the RHS.
+Expressions use explicit multiplication (`2*x`), `^` for powers, and functions
+such as `sin`, `sqrt`, and `log` (natural logarithm). The complete
+[expression reference](MATH_EXPR.md) lists all supported syntax.
 For systems, use one expression per component and zero-based variable names:
 
 ```rust

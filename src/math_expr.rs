@@ -2,6 +2,8 @@
 // Distributed under the Boost Software License, Version 1.0.
 // See LICENSE or https://www.boost.org/LICENSE_1_0.txt.
 
+#![doc = include_str!("../MATH_EXPR.md")]
+
 use num_traits::Float;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};

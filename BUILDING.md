@@ -61,8 +61,8 @@ Fortran and oneMKL redistributable runtimes.
 
 The project supports native Ubuntu 24.04 LTS builds on Intel/AMD x86_64
 (`amd64` packages) and ARM64 with GNU Fortran and Ubuntu's BLAS/LAPACK
-libraries. Intel CPUs do not require Intel oneAPI or MKL on Linux. 
-Although, this might be good idea to use them too. Use current
+libraries. The Linux build script uses GNU Fortran and links BLAS/LAPACK;
+Intel oneAPI/MKL auto-discovery is implemented for Windows only. Use current
 stable Rust from [rustup](https://rustup.rs/) (the crate uses Rust edition 2024).
 Rustup selects `x86_64-unknown-linux-gnu` on Intel/AMD machines and
 `aarch64-unknown-linux-gnu` on ARM64 automatically.

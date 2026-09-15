@@ -1,3 +1,24 @@
+# cauchy-ode examples
+
+[README](README.md) · [Building](BUILDING.md) · [Expression syntax](MATH_EXPR.md)
+
+## Run all examples
+
+From the repository root, after installing the native build dependencies:
+
+```bash
+cargo run --locked --release --example hello_world
+for demo in lorenz rossler thomas aizawa halvorsen four_wing dadras precision; do
+    cargo run --locked --release --example "$demo" -- --no-open || exit
+done
+```
+
+The seven attractor demos write `target/<example>.html`; the precision example
+writes `target/precision/index.html` plus SVG plots and CSV data. Omit
+`--no-open` to launch a browser. Attractor `--output` values are HTML file paths;
+the precision example's `--output` is a directory. Use `--help` on a plotting
+example to list its options. `hello_world` writes CSV to standard output.
+
 ## Precision comparison: four ten-equation systems
 
 ```bash

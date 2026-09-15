@@ -98,17 +98,19 @@ Variables such as `t`, `x`, and `x0` have no special meaning to standalone
 use cauchy_ode::MathExpr;
 use std::collections::HashMap;
 
-let expression = MathExpr::<f64>::parse("sin(pi/2)+x^2").unwrap();
-let values = HashMap::from([("pi", std::f64::consts::PI), ("x", 3.0)]);
-assert!((expression.evaluate(&values).unwrap() - 10.0).abs() < 1e-12);
+fn main() {
+    let expression = MathExpr::<f64>::parse("sin(pi/2)+x^2").unwrap();
+    let values = HashMap::from([("pi", std::f64::consts::PI), ("x", 3.0)]);
+    assert!((expression.evaluate(&values).unwrap() - 10.0).abs() < 1e-12);
 
-let derivative = expression.derive("x").simplify();
-assert!((derivative.evaluate(&values).unwrap() - 6.0).abs() < 1e-12);
+    let derivative = expression.derive("x").simplify();
+    assert!((derivative.evaluate(&values).unwrap() - 6.0).abs() < 1e-12);
 
-let branch = MathExpr::<f64>::parse("iif(x, sqrt(-x), sqrt(x))").unwrap();
-assert_eq!(branch.evaluate(&HashMap::from([("x", -4.0)])).unwrap(), 2.0);
-assert_eq!(MathExpr::<f64>::parse("2^3^2").unwrap()
-    .evaluate(&HashMap::new()).unwrap(), 512.0);
+    let branch = MathExpr::<f64>::parse("iif(x, sqrt(-x), sqrt(x))").unwrap();
+    assert_eq!(branch.evaluate(&HashMap::from([("x", -4.0)])).unwrap(), 2.0);
+    assert_eq!(MathExpr::<f64>::parse("2^3^2").unwrap()
+                   .evaluate(&HashMap::new()).unwrap(), 512.0);
+}
 ```
 
 Parsing borrows variable names from the input string; keep that string alive
